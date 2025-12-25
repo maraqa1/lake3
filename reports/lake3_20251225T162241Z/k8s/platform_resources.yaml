@@ -1,0 +1,1482 @@
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-http01
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"cert-manager.io/cluster-issuer":"letsencrypt-http01","kubernetes.io/ingress.class":"nginx"},"name":"portal","namespace":"platform"},"spec":{"ingressClassName":"nginx","rules":[{"host":"portal.lake3.opendatalake.com","http":{"paths":[{"backend":{"service":{"name":"portal-ui","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}],"tls":[{"hosts":["portal.lake3.opendatalake.com"],"secretName":"portal-tls"}]}}
+      kubernetes.io/ingress.class: nginx
+    creationTimestamp: "2025-12-25T11:30:58Z"
+    generation: 1
+    name: portal
+    namespace: platform
+    resourceVersion: "42260"
+    uid: 887a6fab-8ff3-483b-bb7b-a231c9440f19
+  spec:
+    ingressClassName: nginx
+    rules:
+    - host: portal.lake3.opendatalake.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: portal-ui
+              port:
+                number: 80
+          path: /
+          pathType: Prefix
+    tls:
+    - hosts:
+      - portal.lake3.opendatalake.com
+      secretName: portal-tls
+  status:
+    loadBalancer:
+      ingress:
+      - ip: 37.27.4.125
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "2"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"portal-api","namespace":"platform"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"portal-api"}},"template":{"metadata":{"labels":{"app":"portal-api"}},"spec":{"containers":[{"args":["set -e\npip -q install --no-cache-dir flask kubernetes psycopg2-binary requests \u003e/tmp/pip.log 2\u003e\u00261 || (cat /tmp/pip.log \u0026\u0026 exit 1)\npython /app/app.py\n"],"command":["/bin/sh","-lc"],"env":[{"name":"PYTHONUNBUFFERED","value":"1"}],"envFrom":[{"secretRef":{"name":"portal-catalog-secret"}}],"image":"python:3.12-slim","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":6,"httpGet":{"path":"/api/health","port":8000},"initialDelaySeconds":20,"periodSeconds":10,"timeoutSeconds":2},"name":"api","ports":[{"containerPort":8000}],"readinessProbe":{"failureThreshold":12,"httpGet":{"path":"/api/health","port":8000},"initialDelaySeconds":5,"periodSeconds":5,"timeoutSeconds":2},"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"volumeMounts":[{"mountPath":"/app","name":"code"}]}],"serviceAccountName":"portal-api","volumes":[{"configMap":{"name":"portal-api-code"},"name":"code"}]}}}}
+    creationTimestamp: "2025-12-25T13:47:58Z"
+    generation: 2
+    name: portal-api
+    namespace: platform
+    resourceVersion: "49514"
+    uid: 2866ea38-dc3e-4db3-a1cb-f0f9d7068f21
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: portal-api
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: portal-api
+      spec:
+        containers:
+        - args:
+          - |
+            set -e
+            pip -q install --no-cache-dir flask kubernetes psycopg2-binary requests >/tmp/pip.log 2>&1 || (cat /tmp/pip.log && exit 1)
+            python /app/app.py
+          command:
+          - /bin/sh
+          - -lc
+          env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          envFrom:
+          - secretRef:
+              name: portal-catalog-secret
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /api/health
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 2
+          name: api
+          ports:
+          - containerPort: 8000
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 12
+            httpGet:
+              path: /api/health
+              port: 8000
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /app
+            name: code
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: portal-api
+        serviceAccountName: portal-api
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: portal-api-code
+          name: code
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T13:48:19Z"
+      lastUpdateTime: "2025-12-25T13:48:19Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T13:47:58Z"
+      lastUpdateTime: "2025-12-25T16:15:01Z"
+      message: ReplicaSet "portal-api-5f9574b66c" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "4"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"portal-ui","namespace":"platform"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"portal-ui"}},"template":{"metadata":{"labels":{"app":"portal-ui"}},"spec":{"containers":[{"image":"nginxinc/nginx-unprivileged:1.27-alpine","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":6,"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":15,"periodSeconds":10,"timeoutSeconds":2},"name":"nginx","ports":[{"containerPort":8080}],"readinessProbe":{"failureThreshold":6,"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":2,"periodSeconds":5,"timeoutSeconds":2},"volumeMounts":[{"mountPath":"/etc/nginx/nginx.conf","name":"nginxconf","subPath":"nginx.conf"},{"mountPath":"/usr/share/nginx/html/index.html","name":"web","subPath":"index.html"}]}],"volumes":[{"configMap":{"name":"portal-ui-nginx"},"name":"nginxconf"},{"configMap":{"name":"portal-ui-web"},"name":"web"}]}}}}
+    creationTimestamp: "2025-12-25T08:03:18Z"
+    generation: 4
+    name: portal-ui
+    namespace: platform
+    resourceVersion: "37375"
+    uid: 9e227d34-d2e1-4eac-a0dd-44fe7144fd92
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: portal-ui
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2025-12-25T09:13:52Z"
+        creationTimestamp: null
+        labels:
+          app: portal-ui
+      spec:
+        containers:
+        - image: nginxinc/nginx-unprivileged:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 2
+          name: nginx
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /healthz
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/nginx/nginx.conf
+            name: nginxconf
+            subPath: nginx.conf
+          - mountPath: /usr/share/nginx/html/index.html
+            name: web
+            subPath: index.html
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: portal-ui-nginx
+          name: nginxconf
+        - configMap:
+            defaultMode: 420
+            name: portal-ui-web
+          name: web
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T09:10:31Z"
+      lastUpdateTime: "2025-12-25T09:10:31Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T09:10:31Z"
+      lastUpdateTime: "2025-12-25T10:40:56Z"
+      message: ReplicaSet "portal-ui-bf6fb7975" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 4
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"portal-api","namespace":"platform"},"spec":{"ports":[{"name":"http","port":8000,"targetPort":8000}],"selector":{"app":"portal-api"},"type":"ClusterIP"}}
+    creationTimestamp: "2025-12-25T13:47:58Z"
+    name: portal-api
+    namespace: platform
+    resourceVersion: "44217"
+    uid: d69ee96c-5ed2-454f-a7d5-a64844aea96b
+  spec:
+    clusterIP: 10.43.199.240
+    clusterIPs:
+    - 10.43.199.240
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+    selector:
+      app: portal-api
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"portal-ui","namespace":"platform"},"spec":{"ports":[{"name":"http","port":80,"targetPort":8080}],"selector":{"app":"portal-ui"},"type":"ClusterIP"}}
+    creationTimestamp: "2025-12-25T08:03:18Z"
+    name: portal-ui
+    namespace: platform
+    resourceVersion: "31212"
+    uid: 050b8315-a905-45c4-8be8-0dcd94a1d431
+  spec:
+    clusterIP: 10.43.193.27
+    clusterIPs:
+    - 10.43.193.27
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: portal-ui
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+      dmVyLWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAATnFiU7bBSGw1xnMhMzKu8k+B3pMR+L92SW7nRee1ix
+      lnGEK8372uuBcF8zzrJGnyyma4jMlNPjE6wgZuPi6xMlo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK0kEelYwOY3kgq3QQ8bP
+      NVTy4HEwCgYIKoZIzj0EAwIDSQAwRgIhAMGD2PiWLWEmqssuAOFSqbIZ5w1mpVav
+      Dg26sRLLcrgqAiEAuToBfY7Yafg5C018WzHmZhts9/07vJegDAfzl0AXUgA=
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2025-12-24T20:19:25Z"
+    name: kube-root-ca.crt
+    namespace: platform
+    resourceVersion: "454"
+    uid: 21686a16-5b9e-45ce-b5db-3fb4f52de7cc
+- apiVersion: v1
+  data:
+    app.py: |
+      import os, json
+      from datetime import datetime, timezone
+      from flask import Flask, jsonify
+      from kubernetes import client, config
+      import psycopg2
+      from psycopg2.extras import RealDictCursor
+      import requests
+
+      app = Flask(__name__)
+
+      TARGET_NS = ["open-kpi","airbyte","n8n","tickets","transform","platform"]
+
+      def now():
+        return datetime.now(timezone.utc).isoformat()
+
+      def k8s():
+        try:
+          config.load_incluster_config()
+        except Exception:
+          config.load_kube_config()
+        return client.AppsV1Api(), client.CoreV1Api(), client.NetworkingV1Api()
+
+      def list_workloads():
+        apps, core, net = k8s()
+        out = []
+        errors = []
+        for ns in TARGET_NS:
+          try:
+            deps = apps.list_namespaced_deployment(ns).items
+            stss = apps.list_namespaced_stateful_set(ns).items
+
+            for d in deps:
+              out.append({
+                "namespace": ns,
+                "kind": "Deployment",
+                "name": d.metadata.name,
+                "ready": f"{(d.status.ready_replicas or 0)}/{(d.status.replicas or 0)}",
+                "observedGeneration": d.status.observed_generation,
+                "generation": d.metadata.generation,
+              })
+
+            for s in stss:
+              out.append({
+                "namespace": ns,
+                "kind": "StatefulSet",
+                "name": s.metadata.name,
+                "ready": f"{(s.status.ready_replicas or 0)}/{(s.status.replicas or 0)}",
+                "observedGeneration": s.status.observed_generation,
+                "generation": s.metadata.generation,
+              })
+          except Exception as e:
+            errors.append({"namespace": ns, "error": str(e)})
+        return out, errors
+
+      def pg_query(q, params=None):
+        host = os.environ.get("PG_HOST")
+        port = int(os.environ.get("PG_PORT", "5432"))
+        db   = os.environ.get("PG_DB")
+        user = os.environ.get("PG_RO_USER")
+        pw   = os.environ.get("PG_RO_PASSWORD")
+        if not all([host, db, user, pw]):
+          raise RuntimeError("Postgres env incomplete")
+        conn = psycopg2.connect(host=host, port=port, dbname=db, user=user, password=pw, connect_timeout=2)
+        try:
+          with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(q, params or ())
+            return cur.fetchall()
+        finally:
+          conn.close()
+
+      def minio_health():
+        endpoint = os.environ.get("MINIO_ENDPOINT")
+        if not endpoint:
+          raise RuntimeError("MinIO endpoint missing")
+        r = requests.get(endpoint + "/minio/health/ready", timeout=2)
+        return {"ready_http": (r.status_code == 200), "status_code": r.status_code}
+
+      def airbyte_last_sync():
+        return {"available": False}
+
+      @app.get("/api/health")
+      def health():
+        workloads, errors = list_workloads()
+        return jsonify({"ts": now(), "overall_ok": (len(errors) == 0), "workloads": workloads, "errors": errors})
+
+      @app.get("/api/catalog")
+      def catalog():
+        result = {"ts": now(), "postgres": {"ok": False}, "minio": {"ok": False}}
+        try:
+          rows = pg_query("""
+            select table_schema, table_name
+            from information_schema.tables
+            where table_type='BASE TABLE'
+              and table_schema not in ('pg_catalog','information_schema')
+            order by table_schema, table_name
+            limit 500
+          """)
+          result["postgres"] = {"ok": True, "tables": rows}
+        except Exception as e:
+          result["postgres"] = {"ok": False, "error": str(e)}
+
+        try:
+          result["minio"] = {"ok": True, "health": minio_health()}
+        except Exception as e:
+          result["minio"] = {"ok": False, "error": str(e)}
+
+        return jsonify(result)
+
+      @app.get("/api/ingestion")
+      def ingestion():
+        return jsonify({"ts": now(), "airbyte": airbyte_last_sync()})
+
+      @app.get("/api/summary")
+      def summary():
+        workloads, errors = list_workloads()
+        cat = {}
+        try:
+          # call local function directly
+          cat = json.loads(catalog().get_data(as_text=True))
+        except Exception:
+          cat = {"error": "catalog failed"}
+        return jsonify({
+          "ts": now(),
+          "overall_ok": (len(errors) == 0),
+          "k8s": {"workloads": workloads, "errors": errors},
+          "catalog": cat
+        })
+
+      if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=8000)
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"app.py":"import os, json\nfrom datetime import datetime, timezone\nfrom flask import Flask, jsonify\nfrom kubernetes import client, config\nimport psycopg2\nfrom psycopg2.extras import RealDictCursor\nimport requests\n\napp = Flask(__name__)\n\nTARGET_NS = [\"open-kpi\",\"airbyte\",\"n8n\",\"tickets\",\"transform\",\"platform\"]\n\ndef now():\n  return datetime.now(timezone.utc).isoformat()\n\ndef k8s():\n  try:\n    config.load_incluster_config()\n  except Exception:\n    config.load_kube_config()\n  return client.AppsV1Api(), client.CoreV1Api(), client.NetworkingV1Api()\n\ndef list_workloads():\n  apps, core, net = k8s()\n  out = []\n  errors = []\n  for ns in TARGET_NS:\n    try:\n      deps = apps.list_namespaced_deployment(ns).items\n      stss = apps.list_namespaced_stateful_set(ns).items\n\n      for d in deps:\n        out.append({\n          \"namespace\": ns,\n          \"kind\": \"Deployment\",\n          \"name\": d.metadata.name,\n          \"ready\": f\"{(d.status.ready_replicas or 0)}/{(d.status.replicas or 0)}\",\n          \"observedGeneration\": d.status.observed_generation,\n          \"generation\": d.metadata.generation,\n        })\n\n      for s in stss:\n        out.append({\n          \"namespace\": ns,\n          \"kind\": \"StatefulSet\",\n          \"name\": s.metadata.name,\n          \"ready\": f\"{(s.status.ready_replicas or 0)}/{(s.status.replicas or 0)}\",\n          \"observedGeneration\": s.status.observed_generation,\n          \"generation\": s.metadata.generation,\n        })\n    except Exception as e:\n      errors.append({\"namespace\": ns, \"error\": str(e)})\n  return out, errors\n\ndef pg_query(q, params=None):\n  host = os.environ.get(\"PG_HOST\")\n  port = int(os.environ.get(\"PG_PORT\", \"5432\"))\n  db   = os.environ.get(\"PG_DB\")\n  user = os.environ.get(\"PG_RO_USER\")\n  pw   = os.environ.get(\"PG_RO_PASSWORD\")\n  if not all([host, db, user, pw]):\n    raise RuntimeError(\"Postgres env incomplete\")\n  conn = psycopg2.connect(host=host, port=port, dbname=db, user=user, password=pw, connect_timeout=2)\n  try:\n    with conn.cursor(cursor_factory=RealDictCursor) as cur:\n      cur.execute(q, params or ())\n      return cur.fetchall()\n  finally:\n    conn.close()\n\ndef minio_health():\n  endpoint = os.environ.get(\"MINIO_ENDPOINT\")\n  if not endpoint:\n    raise RuntimeError(\"MinIO endpoint missing\")\n  r = requests.get(endpoint + \"/minio/health/ready\", timeout=2)\n  return {\"ready_http\": (r.status_code == 200), \"status_code\": r.status_code}\n\ndef airbyte_last_sync():\n  return {\"available\": False}\n\n@app.get(\"/api/health\")\ndef health():\n  workloads, errors = list_workloads()\n  return jsonify({\"ts\": now(), \"overall_ok\": (len(errors) == 0), \"workloads\": workloads, \"errors\": errors})\n\n@app.get(\"/api/catalog\")\ndef catalog():\n  result = {\"ts\": now(), \"postgres\": {\"ok\": False}, \"minio\": {\"ok\": False}}\n  try:\n    rows = pg_query(\"\"\"\n      select table_schema, table_name\n      from information_schema.tables\n      where table_type='BASE TABLE'\n        and table_schema not in ('pg_catalog','information_schema')\n      order by table_schema, table_name\n      limit 500\n    \"\"\")\n    result[\"postgres\"] = {\"ok\": True, \"tables\": rows}\n  except Exception as e:\n    result[\"postgres\"] = {\"ok\": False, \"error\": str(e)}\n\n  try:\n    result[\"minio\"] = {\"ok\": True, \"health\": minio_health()}\n  except Exception as e:\n    result[\"minio\"] = {\"ok\": False, \"error\": str(e)}\n\n  return jsonify(result)\n\n@app.get(\"/api/ingestion\")\ndef ingestion():\n  return jsonify({\"ts\": now(), \"airbyte\": airbyte_last_sync()})\n\n@app.get(\"/api/summary\")\ndef summary():\n  workloads, errors = list_workloads()\n  cat = {}\n  try:\n    # call local function directly\n    cat = json.loads(catalog().get_data(as_text=True))\n  except Exception:\n    cat = {\"error\": \"catalog failed\"}\n  return jsonify({\n    \"ts\": now(),\n    \"overall_ok\": (len(errors) == 0),\n    \"k8s\": {\"workloads\": workloads, \"errors\": errors},\n    \"catalog\": cat\n  })\n\nif __name__ == \"__main__\":\n  app.run(host=\"0.0.0.0\", port=8000)\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"portal-api-code","namespace":"platform"}}
+    creationTimestamp: "2025-12-25T13:47:58Z"
+    name: portal-api-code
+    namespace: platform
+    resourceVersion: "49450"
+    uid: 0a9158fa-79b5-404d-a39a-db1ec2b42149
+- apiVersion: v1
+  data:
+    index.html: |
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>Open KPI Portal</title>
+        <style>
+          :root{
+            --bg:#0b1220;
+            --panel:#101a2e;
+            --muted:#8ea0c0;
+            --text:#e8eefc;
+            --good:#27c07d;
+            --warn:#f5c84b;
+            --bad:#ff5a6a;
+            --line:#203052;
+            --chip:#162243;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+            --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+          }
+          *{ box-sizing:border-box; }
+          body{
+            margin:0; font-family:var(--sans); background:linear-gradient(180deg,#070b14, var(--bg));
+            color:var(--text);
+          }
+          header{
+            padding:18px 22px; border-bottom:1px solid var(--line);
+            background:rgba(16,26,46,.7); backdrop-filter: blur(6px);
+            position: sticky; top:0; z-index:10;
+          }
+          .title{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+          h1{ margin:0; font-size:18px; letter-spacing:.2px; font-weight:700; }
+          .sub{ margin-top:6px; color:var(--muted); font-size:12px; display:flex; gap:14px; flex-wrap:wrap; }
+          .wrap{ padding:18px 22px; max-width:1200px; margin:0 auto; }
+          .grid{ display:grid; gap:14px; grid-template-columns: 1.1fr .9fr; }
+          @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+          .panel{
+            background:rgba(16,26,46,.86);
+            border:1px solid var(--line);
+            border-radius:14px;
+            padding:14px;
+          }
+          .panel h2{ margin:0 0 10px 0; font-size:13px; color:#cfe0ff; font-weight:700; letter-spacing:.2px; }
+          .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+          .kpi{
+            padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:rgba(11,18,32,.55);
+            min-width: 160px;
+          }
+          .kpi .label{ color:var(--muted); font-size:11px; }
+          .kpi .value{ margin-top:6px; font-size:16px; font-weight:800; }
+          .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:8px; }
+          .good{ background:var(--good); }
+          .warn{ background:var(--warn); }
+          .bad{ background:var(--bad); }
+          .muted{ color:var(--muted); }
+          .mono{ font-family:var(--mono); }
+          .cards{ display:grid; gap:12px; grid-template-columns: repeat(3, 1fr); }
+          @media (max-width: 980px){ .cards{ grid-template-columns: repeat(2, 1fr); } }
+          @media (max-width: 640px){ .cards{ grid-template-columns: 1fr; } }
+          .card{
+            border:1px solid var(--line); border-radius:14px; padding:12px; background:rgba(11,18,32,.55);
+            display:flex; flex-direction:column; gap:10px;
+          }
+          .card .top{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+          .card .name{ font-weight:800; font-size:13px; letter-spacing:.2px; }
+          .chip{ font-size:11px; padding:4px 8px; border-radius:999px; background:var(--chip); border:1px solid var(--line); color:#cfe0ff; }
+          .card .meta{ display:grid; grid-template-columns: 1fr; gap:6px; font-size:12px; color:var(--muted); }
+          .card .meta b{ color:var(--text); font-weight:700; }
+          a{ color:#9fc0ff; text-decoration:none; }
+          a:hover{ text-decoration:underline; }
+          .table{ width:100%; border-collapse: collapse; font-size:12px; }
+          .table th, .table td{ border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top; }
+          .table th{ color:#cfe0ff; font-weight:700; }
+          .small{ font-size:11px; color:var(--muted); }
+          .right{ text-align:right; }
+          .err{
+            padding:10px 12px; border:1px solid rgba(255,90,106,.35); border-radius:12px;
+            background:rgba(255,90,106,.10); color:#ffd7dc; font-size:12px;
+          }
+          .ok{
+            padding:10px 12px; border:1px solid rgba(39,192,125,.35); border-radius:12px;
+            background:rgba(39,192,125,.10); color:#d6ffe9; font-size:12px;
+          }
+          footer{ padding:18px 22px; color:var(--muted); font-size:11px; border-top:1px solid var(--line); margin-top:18px; }
+          .links{ display:flex; flex-wrap:wrap; gap:10px; }
+          .btnlink{
+            display:inline-flex; gap:8px; align-items:center;
+            border:1px solid var(--line); border-radius:12px; padding:8px 10px; background:rgba(11,18,32,.55);
+          }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div class="title">
+            <h1>Open KPI Portal</h1>
+            <span class="chip mono" id="refreshState">loading</span>
+          </div>
+          <div class="sub">
+            <span class="mono">host: <span id="host"></span></span>
+            <span class="mono">api: <span id="api"></span></span>
+            <span class="mono">last updated: <span id="updatedAt">-</span></span>
+          </div>
+        </header>
+
+        <div class="wrap">
+          <div class="grid">
+            <div class="panel">
+              <h2>Overall platform status</h2>
+              <div class="row" id="kpis">
+                <div class="kpi"><div class="label">Status</div><div class="value" id="overallStatus">-</div></div>
+                <div class="kpi"><div class="label">Apps discovered</div><div class="value" id="appsCount">-</div></div>
+                <div class="kpi"><div class="label">Total restarts</div><div class="value" id="totalRestarts">-</div></div>
+                <div class="kpi"><div class="label">Warnings</div><div class="value" id="warningsCount">-</div></div>
+              </div>
+              <div style="margin-top:12px" id="overallMsg"></div>
+            </div>
+
+            <div class="panel">
+              <h2>Deep links</h2>
+              <div class="links" id="deepLinks"></div>
+              <div class="small" style="margin-top:10px">
+                Postgres link is an info page only (no direct DB exposure).
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top:14px">
+            <h2>Applications</h2>
+            <div class="cards" id="appCards"></div>
+          </div>
+
+          <div class="grid" style="margin-top:14px">
+            <div class="panel">
+              <h2>Data catalogue snapshot</h2>
+              <div id="catalogBlock" class="small">loading</div>
+            </div>
+
+            <div class="panel">
+              <h2>Last ingestion (Airbyte)</h2>
+              <div id="ingestionBlock" class="small">loading</div>
+            </div>
+          </div>
+        </div>
+
+        <footer>
+          <div class="mono">Portal UI served by nginx. Summary sourced from Portal API.</div>
+        </footer>
+
+        <script>
+          // Configuration injected at deploy-time (no hardcoded app presence)
+          const CONFIG = {
+            summaryUrl: "/summary.json",
+            catalogUrl: "/catalog.json",
+            ingestionUrl: "/ingestion.json",
+            healthUrl: "/health.json",
+            deepLinks: {
+              airbyte: "https://airbyte.lake3.opendatalake.com/",
+              minio: "https://minio.lake3.opendatalake.com/",
+              postgresInfo: "/postgres.html",
+              dbt: "https://dbt.lake3.opendatalake.com/",
+              n8n: "https://n8n.lake3.opendatalake.com/",
+              zammad: "https://zammad.lake3.opendatalake.com/"
+            }
+          };
+
+          const el = (id) => document.getElementById(id);
+
+          function fmtTs(ts){
+            if(!ts) return "-";
+            try {
+              const d = new Date(ts);
+              if (isNaN(d.getTime())) return String(ts);
+              return d.toISOString().replace("T"," ").replace("Z","Z");
+            } catch { return String(ts); }
+          }
+
+          function statusDot(s){
+            const v = String(s||"unknown").toLowerCase();
+            if (["ok","ready","healthy","running"].includes(v)) return ["good","OK"];
+            if (["degraded","warning","warn","partial"].includes(v)) return ["warn","DEGRADED"];
+            if (["down","error","failed","unhealthy","notready","missing"].includes(v)) return ["bad","DOWN"];
+            return ["warn","UNKNOWN"];
+          }
+
+          function toInt(x){
+            const n = Number(x);
+            return Number.isFinite(n) ? n : 0;
+          }
+
+          function safeText(x, fallback="-"){
+            if (x === null || x === undefined) return fallback;
+            const s = String(x);
+            return s.length ? s : fallback;
+          }
+
+          function buildDeepLinks(){
+            const items = [
+              ["Airbyte", CONFIG.deepLinks.airbyte],
+              ["MinIO Console", CONFIG.deepLinks.minio],
+              ["Postgres Info", CONFIG.deepLinks.postgresInfo],
+              ["dbt", CONFIG.deepLinks.dbt],
+              ["n8n", CONFIG.deepLinks.n8n],
+              ["Zammad", CONFIG.deepLinks.zammad],
+            ];
+            const wrap = el("deepLinks");
+            wrap.innerHTML = "";
+            for (const [name, url] of items){
+              const a = document.createElement("a");
+              a.className = "btnlink";
+              a.href = url;
+              a.target = (url.startsWith("http") ? "_blank" : "_self");
+              a.rel = "noreferrer";
+              a.textContent = name;
+              wrap.appendChild(a);
+            }
+          }
+
+          function renderApps(apps){
+            const cards = el("appCards");
+            cards.innerHTML = "";
+
+            const list = Array.isArray(apps) ? apps : [];
+            if (!list.length){
+              cards.innerHTML = '<div class="err">No apps returned by /api/summary</div>';
+              return;
+            }
+
+            for (const app of list){
+              const name = safeText(app.name, "unknown");
+              const ns = safeText(app.namespace, "-");
+              const status = safeText(app.status, "unknown");
+              const restarts = toInt(app.restarts);
+              const lastChange = safeText(app.last_change, app.lastChange || "-");
+              const reason = safeText(app.reason, "");
+
+              const [cls, label] = statusDot(status);
+
+              const card = document.createElement("div");
+              card.className = "card";
+
+              const top = document.createElement("div");
+              top.className = "top";
+              top.innerHTML =
+                '<div class="name"><span class="dot '+cls+'"></span>' + name + '</div>' +
+                '<span class="chip mono">' + label + '</span>';
+
+              const meta = document.createElement("div");
+              meta.className = "meta";
+              meta.innerHTML =
+                '<div><b>Namespace:</b> <span class="mono">'+ ns +'</span></div>' +
+                '<div><b>Status:</b> '+ status +'</div>' +
+                '<div><b>Restarts:</b> <span class="mono">'+ restarts +'</span></div>' +
+                '<div><b>Last change:</b> <span class="mono">'+ fmtTs(lastChange) +'</span></div>' +
+                (reason ? '<div><b>Note:</b> '+ reason +'</div>' : '');
+
+              card.appendChild(top);
+              card.appendChild(meta);
+              cards.appendChild(card);
+            }
+          }
+
+          function renderCatalog(cat){
+            const block = el("catalogBlock");
+            const pg = cat && cat.postgres ? cat.postgres : null;
+            const mi = cat && cat.minio ? cat.minio : null;
+
+            const schemas = (pg && Array.isArray(pg.schemas)) ? pg.schemas : [];
+            const buckets = (mi && Array.isArray(mi.buckets)) ? mi.buckets : [];
+
+            let html = "";
+            html += '<div class="small muted" style="margin-bottom:8px">Postgres schemas/tables and MinIO buckets from portal read-only accounts.</div>';
+
+            html += '<div style="margin-top:8px"><b>Postgres</b></div>';
+            if (!schemas.length){
+              html += '<div class="small muted">No schemas returned.</div>';
+            } else {
+              html += '<table class="table"><thead><tr><th>Schema</th><th>Tables</th></tr></thead><tbody>';
+              for (const s of schemas){
+                const sn = safeText(s.schema, "-");
+                const tcount = (s.tables && Array.isArray(s.tables)) ? s.tables.length : toInt(s.table_count);
+                const preview = (s.tables && Array.isArray(s.tables)) ? s.tables.slice(0, 8).join(", ") : "";
+                html += '<tr><td class="mono">'+sn+'</td><td><span class="mono">'+tcount+'</span>' +
+                        (preview ? '<div class="small muted mono">'+preview+(tcount>8?" …":"")+'</div>' : '') +
+                        '</td></tr>';
+              }
+              html += '</tbody></table>';
+            }
+
+            html += '<div style="margin-top:12px"><b>MinIO</b></div>';
+            if (!buckets.length){
+              html += '<div class="small muted">No buckets returned.</div>';
+            } else {
+              html += '<table class="table"><thead><tr><th>Bucket</th><th class="right">Objects</th></tr></thead><tbody>';
+              for (const b of buckets){
+                const bn = safeText(b.name, "-");
+                const oc = toInt(b.objects || b.object_count);
+                html += '<tr><td class="mono">'+bn+'</td><td class="right mono">'+oc+'</td></tr>';
+              }
+              html += '</tbody></table>';
+            }
+
+            if (cat && cat.error){
+              html += '<div class="err" style="margin-top:10px">Catalog error: '+ safeText(cat.error) +'</div>';
+            }
+
+            block.innerHTML = html;
+          }
+
+          function renderIngestion(ing){
+            const block = el("ingestionBlock");
+            let html = "";
+            if (!ing){
+              block.innerHTML = '<div class="small muted">No ingestion payload.</div>';
+              return;
+            }
+
+            if (ing.error){
+              html += '<div class="err">Airbyte ingestion unavailable: '+ safeText(ing.error) +'</div>';
+            }
+
+            const last = ing.last_sync || ing.lastSync || null;
+            const streams = ing.streams || null;
+            const src = safeText(ing.source, "");
+            const dst = safeText(ing.destination, "");
+
+            html += '<div class="kpi" style="display:inline-block; margin:8px 0 10px 0; min-width:auto">';
+            html += '<div class="label">Last sync</div><div class="value mono">'+ fmtTs(last) +'</div></div>';
+
+            html += '<div class="small muted">source: <span class="mono">'+safeText(src,"-")+'</span> &nbsp; destination: <span class="mono">'+safeText(dst,"-")+'</span></div>';
+
+            if (Array.isArray(streams) && streams.length){
+              html += '<table class="table" style="margin-top:10px"><thead><tr><th>Connection</th><th>Status</th><th>When</th></tr></thead><tbody>';
+              for (const s of streams.slice(0, 20)){
+                html += '<tr><td class="mono">'+safeText(s.connection,"-")+'</td><td>'+safeText(s.status,"-")+'</td><td class="mono">'+fmtTs(s.when)+'</td></tr>';
+              }
+              html += '</tbody></table>';
+              if (streams.length > 20){
+                html += '<div class="small muted">Showing first 20 connections.</div>';
+              }
+            } else {
+              html += '<div class="small muted" style="margin-top:10px">No connection-level ingestion detail returned.</div>';
+            }
+
+            block.innerHTML = html;
+          }
+
+          function renderOverall(summary){
+            const overall = summary && summary.overall ? summary.overall : {};
+            const apps = summary && Array.isArray(summary.apps) ? summary.apps : [];
+
+            const status = safeText(overall.status, "unknown");
+            const [cls, label] = statusDot(status);
+
+            el("overallStatus").innerHTML = '<span class="dot '+cls+'"></span>' + label;
+            el("appsCount").textContent = String(apps.length);
+
+            const totalRestarts = apps.reduce((acc,a)=>acc+toInt(a.restarts), 0);
+            el("totalRestarts").textContent = String(totalRestarts);
+
+            const warns = apps.filter(a => {
+              const s = String(a.status||"").toLowerCase();
+              return ["degraded","warning","warn","partial","down","error","failed","unhealthy","notready","missing"].includes(s);
+            }).length;
+            el("warningsCount").textContent = String(warns);
+
+            const msg = overall.message || "";
+            const box = el("overallMsg");
+            if (label === "OK" && !msg){
+              box.innerHTML = '<div class="ok">Platform healthy.</div>';
+            } else if (label !== "OK") {
+              box.innerHTML = '<div class="err">'+ safeText(msg, "Platform degraded.") +'</div>';
+            } else {
+              box.innerHTML = '<div class="ok">'+ safeText(msg, "Platform healthy.") +'</div>';
+            }
+          }
+
+          async function fetchJson(url){
+            const r = await fetch(url, { cache: "no-store" });
+            const t = await r.text();
+            try { return JSON.parse(t); } catch { return { error: "invalid_json", raw: t }; }
+          }
+
+          async function refresh(){
+            el("refreshState").textContent = "refreshing";
+            try{
+              const summary = await fetchJson(CONFIG.summaryUrl);
+              const catalog = await fetchJson(CONFIG.catalogUrl);
+              const ingestion = await fetchJson(CONFIG.ingestionUrl);
+
+              renderOverall(summary);
+              renderApps(summary.apps);
+              renderCatalog(catalog);
+              renderIngestion(ingestion);
+
+              el("updatedAt").textContent = fmtTs(summary.generated_at || summary.generatedAt || new Date().toISOString());
+              el("refreshState").textContent = "ok";
+            } catch(e){
+              el("refreshState").textContent = "error";
+              el("overallMsg").innerHTML = '<div class="err">UI refresh failed: '+ safeText(e && e.message ? e.message : e) +'</div>';
+            }
+          }
+
+          // Postgres info page (static)
+          (function bootstrapStaticPages(){
+            // create postgres.html dynamically if missing (for simple setups)
+            // (nginx serves from ConfigMap, so this is informational only)
+          })();
+
+          (function init(){
+            el("host").textContent = window.location.host;
+            el("api").textContent = "proxied endpoints: /summary.json /catalog.json /ingestion.json /health.json";
+            buildDeepLinks();
+            refresh();
+            setInterval(refresh, 15000);
+          })();
+        </script>
+      </body>
+      </html>
+    nginx.conf: |
+      worker_processes  1;
+
+      events { worker_connections 1024; }
+
+      http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        sendfile        on;
+        keepalive_timeout  65;
+
+        # Small cache for summary to reduce API load
+        proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=summarycache:10m max_size=32m inactive=30s use_temp_path=off;
+
+        server {
+          listen 8080;
+          server_name _;
+
+          root /usr/share/nginx/html;
+          index index.html;
+
+          # Static assets
+          location = / {
+            try_files /index.html =404;
+          }
+
+          location /assets/ {
+            try_files $uri =404;
+            add_header Cache-Control "public, max-age=3600";
+          }
+
+          # Proxy ONLY the endpoints the UI needs, mapped to JSON files.
+          # This avoids directly exposing the full Portal API surface.
+          location = /summary.json {
+            proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/summary;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_cache summarycache;
+            proxy_cache_valid 200 10s;
+            proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+            add_header Content-Type "application/json";
+          }
+
+          location = /health.json {
+            proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/health;
+            proxy_set_header Host $host;
+            add_header Content-Type "application/json";
+          }
+
+          location = /catalog.json {
+            proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/catalog;
+            proxy_set_header Host $host;
+            add_header Content-Type "application/json";
+          }
+
+          location = /ingestion.json {
+            proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/ingestion;
+            proxy_set_header Host $host;
+            add_header Content-Type "application/json";
+          }
+
+          # Fallback SPA routing
+          location / {
+            try_files $uri /index.html;
+          }
+        }
+      }
+    postgres.html: |
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>Postgres Info</title>
+        <style>
+          body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:20px; background:#0b1220; color:#e8eefc; }
+          .panel{ max-width:860px; margin:0 auto; padding:16px; border:1px solid #203052; border-radius:14px; background:#101a2e; }
+          h1{ margin:0 0 10px 0; font-size:18px; }
+          .muted{ color:#8ea0c0; }
+          .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+          a{ color:#9fc0ff; text-decoration:none; }
+          a:hover{ text-decoration:underline; }
+          ul{ margin:10px 0 0 18px; }
+        </style>
+      </head>
+      <body>
+        <div class="panel">
+          <h1>Postgres (Info Only)</h1>
+          <div class="muted">
+            No direct database access is exposed via the portal. Use internal connectivity (within the cluster or VPN/bastion) to connect.
+          </div>
+          <ul>
+            <li>Service: <span class="mono">openkpi-postgres.open-kpi.svc.cluster.local:5432</span> (internal)</li>
+            <li>Catalog access is provided to the Portal API via a read-only role (<span class="mono">portal_ro</span>).</li>
+            <li>For external access, publish a separate controlled endpoint with explicit allowlists and auditing.</li>
+          </ul>
+          <div style="margin-top:14px">
+            <a href="/">Back to Portal</a>
+          </div>
+        </div>
+      </body>
+      </html>
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"index.html":"\u003c!doctype html\u003e\n\u003chtml lang=\"en\"\u003e\n\u003chead\u003e\n  \u003cmeta charset=\"utf-8\"/\u003e\n  \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/\u003e\n  \u003ctitle\u003eOpen KPI Portal\u003c/title\u003e\n  \u003cstyle\u003e\n    :root{\n      --bg:#0b1220;\n      --panel:#101a2e;\n      --muted:#8ea0c0;\n      --text:#e8eefc;\n      --good:#27c07d;\n      --warn:#f5c84b;\n      --bad:#ff5a6a;\n      --line:#203052;\n      --chip:#162243;\n      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\",\"Courier New\", monospace;\n      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, \"Apple Color Emoji\", \"Segoe UI Emoji\";\n    }\n    *{ box-sizing:border-box; }\n    body{\n      margin:0; font-family:var(--sans); background:linear-gradient(180deg,#070b14, var(--bg));\n      color:var(--text);\n    }\n    header{\n      padding:18px 22px; border-bottom:1px solid var(--line);\n      background:rgba(16,26,46,.7); backdrop-filter: blur(6px);\n      position: sticky; top:0; z-index:10;\n    }\n    .title{ display:flex; align-items:center; justify-content:space-between; gap:12px; }\n    h1{ margin:0; font-size:18px; letter-spacing:.2px; font-weight:700; }\n    .sub{ margin-top:6px; color:var(--muted); font-size:12px; display:flex; gap:14px; flex-wrap:wrap; }\n    .wrap{ padding:18px 22px; max-width:1200px; margin:0 auto; }\n    .grid{ display:grid; gap:14px; grid-template-columns: 1.1fr .9fr; }\n    @media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }\n    .panel{\n      background:rgba(16,26,46,.86);\n      border:1px solid var(--line);\n      border-radius:14px;\n      padding:14px;\n    }\n    .panel h2{ margin:0 0 10px 0; font-size:13px; color:#cfe0ff; font-weight:700; letter-spacing:.2px; }\n    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }\n    .kpi{\n      padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:rgba(11,18,32,.55);\n      min-width: 160px;\n    }\n    .kpi .label{ color:var(--muted); font-size:11px; }\n    .kpi .value{ margin-top:6px; font-size:16px; font-weight:800; }\n    .dot{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:8px; }\n    .good{ background:var(--good); }\n    .warn{ background:var(--warn); }\n    .bad{ background:var(--bad); }\n    .muted{ color:var(--muted); }\n    .mono{ font-family:var(--mono); }\n    .cards{ display:grid; gap:12px; grid-template-columns: repeat(3, 1fr); }\n    @media (max-width: 980px){ .cards{ grid-template-columns: repeat(2, 1fr); } }\n    @media (max-width: 640px){ .cards{ grid-template-columns: 1fr; } }\n    .card{\n      border:1px solid var(--line); border-radius:14px; padding:12px; background:rgba(11,18,32,.55);\n      display:flex; flex-direction:column; gap:10px;\n    }\n    .card .top{ display:flex; justify-content:space-between; align-items:center; gap:10px; }\n    .card .name{ font-weight:800; font-size:13px; letter-spacing:.2px; }\n    .chip{ font-size:11px; padding:4px 8px; border-radius:999px; background:var(--chip); border:1px solid var(--line); color:#cfe0ff; }\n    .card .meta{ display:grid; grid-template-columns: 1fr; gap:6px; font-size:12px; color:var(--muted); }\n    .card .meta b{ color:var(--text); font-weight:700; }\n    a{ color:#9fc0ff; text-decoration:none; }\n    a:hover{ text-decoration:underline; }\n    .table{ width:100%; border-collapse: collapse; font-size:12px; }\n    .table th, .table td{ border-bottom:1px solid var(--line); padding:8px 6px; text-align:left; vertical-align:top; }\n    .table th{ color:#cfe0ff; font-weight:700; }\n    .small{ font-size:11px; color:var(--muted); }\n    .right{ text-align:right; }\n    .err{\n      padding:10px 12px; border:1px solid rgba(255,90,106,.35); border-radius:12px;\n      background:rgba(255,90,106,.10); color:#ffd7dc; font-size:12px;\n    }\n    .ok{\n      padding:10px 12px; border:1px solid rgba(39,192,125,.35); border-radius:12px;\n      background:rgba(39,192,125,.10); color:#d6ffe9; font-size:12px;\n    }\n    footer{ padding:18px 22px; color:var(--muted); font-size:11px; border-top:1px solid var(--line); margin-top:18px; }\n    .links{ display:flex; flex-wrap:wrap; gap:10px; }\n    .btnlink{\n      display:inline-flex; gap:8px; align-items:center;\n      border:1px solid var(--line); border-radius:12px; padding:8px 10px; background:rgba(11,18,32,.55);\n    }\n  \u003c/style\u003e\n\u003c/head\u003e\n\u003cbody\u003e\n  \u003cheader\u003e\n    \u003cdiv class=\"title\"\u003e\n      \u003ch1\u003eOpen KPI Portal\u003c/h1\u003e\n      \u003cspan class=\"chip mono\" id=\"refreshState\"\u003eloading\u003c/span\u003e\n    \u003c/div\u003e\n    \u003cdiv class=\"sub\"\u003e\n      \u003cspan class=\"mono\"\u003ehost: \u003cspan id=\"host\"\u003e\u003c/span\u003e\u003c/span\u003e\n      \u003cspan class=\"mono\"\u003eapi: \u003cspan id=\"api\"\u003e\u003c/span\u003e\u003c/span\u003e\n      \u003cspan class=\"mono\"\u003elast updated: \u003cspan id=\"updatedAt\"\u003e-\u003c/span\u003e\u003c/span\u003e\n    \u003c/div\u003e\n  \u003c/header\u003e\n\n  \u003cdiv class=\"wrap\"\u003e\n    \u003cdiv class=\"grid\"\u003e\n      \u003cdiv class=\"panel\"\u003e\n        \u003ch2\u003eOverall platform status\u003c/h2\u003e\n        \u003cdiv class=\"row\" id=\"kpis\"\u003e\n          \u003cdiv class=\"kpi\"\u003e\u003cdiv class=\"label\"\u003eStatus\u003c/div\u003e\u003cdiv class=\"value\" id=\"overallStatus\"\u003e-\u003c/div\u003e\u003c/div\u003e\n          \u003cdiv class=\"kpi\"\u003e\u003cdiv class=\"label\"\u003eApps discovered\u003c/div\u003e\u003cdiv class=\"value\" id=\"appsCount\"\u003e-\u003c/div\u003e\u003c/div\u003e\n          \u003cdiv class=\"kpi\"\u003e\u003cdiv class=\"label\"\u003eTotal restarts\u003c/div\u003e\u003cdiv class=\"value\" id=\"totalRestarts\"\u003e-\u003c/div\u003e\u003c/div\u003e\n          \u003cdiv class=\"kpi\"\u003e\u003cdiv class=\"label\"\u003eWarnings\u003c/div\u003e\u003cdiv class=\"value\" id=\"warningsCount\"\u003e-\u003c/div\u003e\u003c/div\u003e\n        \u003c/div\u003e\n        \u003cdiv style=\"margin-top:12px\" id=\"overallMsg\"\u003e\u003c/div\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class=\"panel\"\u003e\n        \u003ch2\u003eDeep links\u003c/h2\u003e\n        \u003cdiv class=\"links\" id=\"deepLinks\"\u003e\u003c/div\u003e\n        \u003cdiv class=\"small\" style=\"margin-top:10px\"\u003e\n          Postgres link is an info page only (no direct DB exposure).\n        \u003c/div\u003e\n      \u003c/div\u003e\n    \u003c/div\u003e\n\n    \u003cdiv class=\"panel\" style=\"margin-top:14px\"\u003e\n      \u003ch2\u003eApplications\u003c/h2\u003e\n      \u003cdiv class=\"cards\" id=\"appCards\"\u003e\u003c/div\u003e\n    \u003c/div\u003e\n\n    \u003cdiv class=\"grid\" style=\"margin-top:14px\"\u003e\n      \u003cdiv class=\"panel\"\u003e\n        \u003ch2\u003eData catalogue snapshot\u003c/h2\u003e\n        \u003cdiv id=\"catalogBlock\" class=\"small\"\u003eloading\u003c/div\u003e\n      \u003c/div\u003e\n\n      \u003cdiv class=\"panel\"\u003e\n        \u003ch2\u003eLast ingestion (Airbyte)\u003c/h2\u003e\n        \u003cdiv id=\"ingestionBlock\" class=\"small\"\u003eloading\u003c/div\u003e\n      \u003c/div\u003e\n    \u003c/div\u003e\n  \u003c/div\u003e\n\n  \u003cfooter\u003e\n    \u003cdiv class=\"mono\"\u003ePortal UI served by nginx. Summary sourced from Portal API.\u003c/div\u003e\n  \u003c/footer\u003e\n\n  \u003cscript\u003e\n    // Configuration injected at deploy-time (no hardcoded app presence)\n    const CONFIG = {\n      summaryUrl: \"/summary.json\",\n      catalogUrl: \"/catalog.json\",\n      ingestionUrl: \"/ingestion.json\",\n      healthUrl: \"/health.json\",\n      deepLinks: {\n        airbyte: \"https://airbyte.lake3.opendatalake.com/\",\n        minio: \"https://minio.lake3.opendatalake.com/\",\n        postgresInfo: \"/postgres.html\",\n        dbt: \"https://dbt.lake3.opendatalake.com/\",\n        n8n: \"https://n8n.lake3.opendatalake.com/\",\n        zammad: \"https://zammad.lake3.opendatalake.com/\"\n      }\n    };\n\n    const el = (id) =\u003e document.getElementById(id);\n\n    function fmtTs(ts){\n      if(!ts) return \"-\";\n      try {\n        const d = new Date(ts);\n        if (isNaN(d.getTime())) return String(ts);\n        return d.toISOString().replace(\"T\",\" \").replace(\"Z\",\"Z\");\n      } catch { return String(ts); }\n    }\n\n    function statusDot(s){\n      const v = String(s||\"unknown\").toLowerCase();\n      if ([\"ok\",\"ready\",\"healthy\",\"running\"].includes(v)) return [\"good\",\"OK\"];\n      if ([\"degraded\",\"warning\",\"warn\",\"partial\"].includes(v)) return [\"warn\",\"DEGRADED\"];\n      if ([\"down\",\"error\",\"failed\",\"unhealthy\",\"notready\",\"missing\"].includes(v)) return [\"bad\",\"DOWN\"];\n      return [\"warn\",\"UNKNOWN\"];\n    }\n\n    function toInt(x){\n      const n = Number(x);\n      return Number.isFinite(n) ? n : 0;\n    }\n\n    function safeText(x, fallback=\"-\"){\n      if (x === null || x === undefined) return fallback;\n      const s = String(x);\n      return s.length ? s : fallback;\n    }\n\n    function buildDeepLinks(){\n      const items = [\n        [\"Airbyte\", CONFIG.deepLinks.airbyte],\n        [\"MinIO Console\", CONFIG.deepLinks.minio],\n        [\"Postgres Info\", CONFIG.deepLinks.postgresInfo],\n        [\"dbt\", CONFIG.deepLinks.dbt],\n        [\"n8n\", CONFIG.deepLinks.n8n],\n        [\"Zammad\", CONFIG.deepLinks.zammad],\n      ];\n      const wrap = el(\"deepLinks\");\n      wrap.innerHTML = \"\";\n      for (const [name, url] of items){\n        const a = document.createElement(\"a\");\n        a.className = \"btnlink\";\n        a.href = url;\n        a.target = (url.startsWith(\"http\") ? \"_blank\" : \"_self\");\n        a.rel = \"noreferrer\";\n        a.textContent = name;\n        wrap.appendChild(a);\n      }\n    }\n\n    function renderApps(apps){\n      const cards = el(\"appCards\");\n      cards.innerHTML = \"\";\n\n      const list = Array.isArray(apps) ? apps : [];\n      if (!list.length){\n        cards.innerHTML = '\u003cdiv class=\"err\"\u003eNo apps returned by /api/summary\u003c/div\u003e';\n        return;\n      }\n\n      for (const app of list){\n        const name = safeText(app.name, \"unknown\");\n        const ns = safeText(app.namespace, \"-\");\n        const status = safeText(app.status, \"unknown\");\n        const restarts = toInt(app.restarts);\n        const lastChange = safeText(app.last_change, app.lastChange || \"-\");\n        const reason = safeText(app.reason, \"\");\n\n        const [cls, label] = statusDot(status);\n\n        const card = document.createElement(\"div\");\n        card.className = \"card\";\n\n        const top = document.createElement(\"div\");\n        top.className = \"top\";\n        top.innerHTML =\n          '\u003cdiv class=\"name\"\u003e\u003cspan class=\"dot '+cls+'\"\u003e\u003c/span\u003e' + name + '\u003c/div\u003e' +\n          '\u003cspan class=\"chip mono\"\u003e' + label + '\u003c/span\u003e';\n\n        const meta = document.createElement(\"div\");\n        meta.className = \"meta\";\n        meta.innerHTML =\n          '\u003cdiv\u003e\u003cb\u003eNamespace:\u003c/b\u003e \u003cspan class=\"mono\"\u003e'+ ns +'\u003c/span\u003e\u003c/div\u003e' +\n          '\u003cdiv\u003e\u003cb\u003eStatus:\u003c/b\u003e '+ status +'\u003c/div\u003e' +\n          '\u003cdiv\u003e\u003cb\u003eRestarts:\u003c/b\u003e \u003cspan class=\"mono\"\u003e'+ restarts +'\u003c/span\u003e\u003c/div\u003e' +\n          '\u003cdiv\u003e\u003cb\u003eLast change:\u003c/b\u003e \u003cspan class=\"mono\"\u003e'+ fmtTs(lastChange) +'\u003c/span\u003e\u003c/div\u003e' +\n          (reason ? '\u003cdiv\u003e\u003cb\u003eNote:\u003c/b\u003e '+ reason +'\u003c/div\u003e' : '');\n\n        card.appendChild(top);\n        card.appendChild(meta);\n        cards.appendChild(card);\n      }\n    }\n\n    function renderCatalog(cat){\n      const block = el(\"catalogBlock\");\n      const pg = cat \u0026\u0026 cat.postgres ? cat.postgres : null;\n      const mi = cat \u0026\u0026 cat.minio ? cat.minio : null;\n\n      const schemas = (pg \u0026\u0026 Array.isArray(pg.schemas)) ? pg.schemas : [];\n      const buckets = (mi \u0026\u0026 Array.isArray(mi.buckets)) ? mi.buckets : [];\n\n      let html = \"\";\n      html += '\u003cdiv class=\"small muted\" style=\"margin-bottom:8px\"\u003ePostgres schemas/tables and MinIO buckets from portal read-only accounts.\u003c/div\u003e';\n\n      html += '\u003cdiv style=\"margin-top:8px\"\u003e\u003cb\u003ePostgres\u003c/b\u003e\u003c/div\u003e';\n      if (!schemas.length){\n        html += '\u003cdiv class=\"small muted\"\u003eNo schemas returned.\u003c/div\u003e';\n      } else {\n        html += '\u003ctable class=\"table\"\u003e\u003cthead\u003e\u003ctr\u003e\u003cth\u003eSchema\u003c/th\u003e\u003cth\u003eTables\u003c/th\u003e\u003c/tr\u003e\u003c/thead\u003e\u003ctbody\u003e';\n        for (const s of schemas){\n          const sn = safeText(s.schema, \"-\");\n          const tcount = (s.tables \u0026\u0026 Array.isArray(s.tables)) ? s.tables.length : toInt(s.table_count);\n          const preview = (s.tables \u0026\u0026 Array.isArray(s.tables)) ? s.tables.slice(0, 8).join(\", \") : \"\";\n          html += '\u003ctr\u003e\u003ctd class=\"mono\"\u003e'+sn+'\u003c/td\u003e\u003ctd\u003e\u003cspan class=\"mono\"\u003e'+tcount+'\u003c/span\u003e' +\n                  (preview ? '\u003cdiv class=\"small muted mono\"\u003e'+preview+(tcount\u003e8?\" …\":\"\")+'\u003c/div\u003e' : '') +\n                  '\u003c/td\u003e\u003c/tr\u003e';\n        }\n        html += '\u003c/tbody\u003e\u003c/table\u003e';\n      }\n\n      html += '\u003cdiv style=\"margin-top:12px\"\u003e\u003cb\u003eMinIO\u003c/b\u003e\u003c/div\u003e';\n      if (!buckets.length){\n        html += '\u003cdiv class=\"small muted\"\u003eNo buckets returned.\u003c/div\u003e';\n      } else {\n        html += '\u003ctable class=\"table\"\u003e\u003cthead\u003e\u003ctr\u003e\u003cth\u003eBucket\u003c/th\u003e\u003cth class=\"right\"\u003eObjects\u003c/th\u003e\u003c/tr\u003e\u003c/thead\u003e\u003ctbody\u003e';\n        for (const b of buckets){\n          const bn = safeText(b.name, \"-\");\n          const oc = toInt(b.objects || b.object_count);\n          html += '\u003ctr\u003e\u003ctd class=\"mono\"\u003e'+bn+'\u003c/td\u003e\u003ctd class=\"right mono\"\u003e'+oc+'\u003c/td\u003e\u003c/tr\u003e';\n        }\n        html += '\u003c/tbody\u003e\u003c/table\u003e';\n      }\n\n      if (cat \u0026\u0026 cat.error){\n        html += '\u003cdiv class=\"err\" style=\"margin-top:10px\"\u003eCatalog error: '+ safeText(cat.error) +'\u003c/div\u003e';\n      }\n\n      block.innerHTML = html;\n    }\n\n    function renderIngestion(ing){\n      const block = el(\"ingestionBlock\");\n      let html = \"\";\n      if (!ing){\n        block.innerHTML = '\u003cdiv class=\"small muted\"\u003eNo ingestion payload.\u003c/div\u003e';\n        return;\n      }\n\n      if (ing.error){\n        html += '\u003cdiv class=\"err\"\u003eAirbyte ingestion unavailable: '+ safeText(ing.error) +'\u003c/div\u003e';\n      }\n\n      const last = ing.last_sync || ing.lastSync || null;\n      const streams = ing.streams || null;\n      const src = safeText(ing.source, \"\");\n      const dst = safeText(ing.destination, \"\");\n\n      html += '\u003cdiv class=\"kpi\" style=\"display:inline-block; margin:8px 0 10px 0; min-width:auto\"\u003e';\n      html += '\u003cdiv class=\"label\"\u003eLast sync\u003c/div\u003e\u003cdiv class=\"value mono\"\u003e'+ fmtTs(last) +'\u003c/div\u003e\u003c/div\u003e';\n\n      html += '\u003cdiv class=\"small muted\"\u003esource: \u003cspan class=\"mono\"\u003e'+safeText(src,\"-\")+'\u003c/span\u003e \u0026nbsp; destination: \u003cspan class=\"mono\"\u003e'+safeText(dst,\"-\")+'\u003c/span\u003e\u003c/div\u003e';\n\n      if (Array.isArray(streams) \u0026\u0026 streams.length){\n        html += '\u003ctable class=\"table\" style=\"margin-top:10px\"\u003e\u003cthead\u003e\u003ctr\u003e\u003cth\u003eConnection\u003c/th\u003e\u003cth\u003eStatus\u003c/th\u003e\u003cth\u003eWhen\u003c/th\u003e\u003c/tr\u003e\u003c/thead\u003e\u003ctbody\u003e';\n        for (const s of streams.slice(0, 20)){\n          html += '\u003ctr\u003e\u003ctd class=\"mono\"\u003e'+safeText(s.connection,\"-\")+'\u003c/td\u003e\u003ctd\u003e'+safeText(s.status,\"-\")+'\u003c/td\u003e\u003ctd class=\"mono\"\u003e'+fmtTs(s.when)+'\u003c/td\u003e\u003c/tr\u003e';\n        }\n        html += '\u003c/tbody\u003e\u003c/table\u003e';\n        if (streams.length \u003e 20){\n          html += '\u003cdiv class=\"small muted\"\u003eShowing first 20 connections.\u003c/div\u003e';\n        }\n      } else {\n        html += '\u003cdiv class=\"small muted\" style=\"margin-top:10px\"\u003eNo connection-level ingestion detail returned.\u003c/div\u003e';\n      }\n\n      block.innerHTML = html;\n    }\n\n    function renderOverall(summary){\n      const overall = summary \u0026\u0026 summary.overall ? summary.overall : {};\n      const apps = summary \u0026\u0026 Array.isArray(summary.apps) ? summary.apps : [];\n\n      const status = safeText(overall.status, \"unknown\");\n      const [cls, label] = statusDot(status);\n\n      el(\"overallStatus\").innerHTML = '\u003cspan class=\"dot '+cls+'\"\u003e\u003c/span\u003e' + label;\n      el(\"appsCount\").textContent = String(apps.length);\n\n      const totalRestarts = apps.reduce((acc,a)=\u003eacc+toInt(a.restarts), 0);\n      el(\"totalRestarts\").textContent = String(totalRestarts);\n\n      const warns = apps.filter(a =\u003e {\n        const s = String(a.status||\"\").toLowerCase();\n        return [\"degraded\",\"warning\",\"warn\",\"partial\",\"down\",\"error\",\"failed\",\"unhealthy\",\"notready\",\"missing\"].includes(s);\n      }).length;\n      el(\"warningsCount\").textContent = String(warns);\n\n      const msg = overall.message || \"\";\n      const box = el(\"overallMsg\");\n      if (label === \"OK\" \u0026\u0026 !msg){\n        box.innerHTML = '\u003cdiv class=\"ok\"\u003ePlatform healthy.\u003c/div\u003e';\n      } else if (label !== \"OK\") {\n        box.innerHTML = '\u003cdiv class=\"err\"\u003e'+ safeText(msg, \"Platform degraded.\") +'\u003c/div\u003e';\n      } else {\n        box.innerHTML = '\u003cdiv class=\"ok\"\u003e'+ safeText(msg, \"Platform healthy.\") +'\u003c/div\u003e';\n      }\n    }\n\n    async function fetchJson(url){\n      const r = await fetch(url, { cache: \"no-store\" });\n      const t = await r.text();\n      try { return JSON.parse(t); } catch { return { error: \"invalid_json\", raw: t }; }\n    }\n\n    async function refresh(){\n      el(\"refreshState\").textContent = \"refreshing\";\n      try{\n        const summary = await fetchJson(CONFIG.summaryUrl);\n        const catalog = await fetchJson(CONFIG.catalogUrl);\n        const ingestion = await fetchJson(CONFIG.ingestionUrl);\n\n        renderOverall(summary);\n        renderApps(summary.apps);\n        renderCatalog(catalog);\n        renderIngestion(ingestion);\n\n        el(\"updatedAt\").textContent = fmtTs(summary.generated_at || summary.generatedAt || new Date().toISOString());\n        el(\"refreshState\").textContent = \"ok\";\n      } catch(e){\n        el(\"refreshState\").textContent = \"error\";\n        el(\"overallMsg\").innerHTML = '\u003cdiv class=\"err\"\u003eUI refresh failed: '+ safeText(e \u0026\u0026 e.message ? e.message : e) +'\u003c/div\u003e';\n      }\n    }\n\n    // Postgres info page (static)\n    (function bootstrapStaticPages(){\n      // create postgres.html dynamically if missing (for simple setups)\n      // (nginx serves from ConfigMap, so this is informational only)\n    })();\n\n    (function init(){\n      el(\"host\").textContent = window.location.host;\n      el(\"api\").textContent = \"proxied endpoints: /summary.json /catalog.json /ingestion.json /health.json\";\n      buildDeepLinks();\n      refresh();\n      setInterval(refresh, 15000);\n    })();\n  \u003c/script\u003e\n\u003c/body\u003e\n\u003c/html\u003e\n","nginx.conf":"worker_processes  1;\n\nevents { worker_connections 1024; }\n\nhttp {\n  include       /etc/nginx/mime.types;\n  default_type  application/octet-stream;\n\n  sendfile        on;\n  keepalive_timeout  65;\n\n  # Small cache for summary to reduce API load\n  proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=summarycache:10m max_size=32m inactive=30s use_temp_path=off;\n\n  server {\n    listen 8080;\n    server_name _;\n\n    root /usr/share/nginx/html;\n    index index.html;\n\n    # Static assets\n    location = / {\n      try_files /index.html =404;\n    }\n\n    location /assets/ {\n      try_files $uri =404;\n      add_header Cache-Control \"public, max-age=3600\";\n    }\n\n    # Proxy ONLY the endpoints the UI needs, mapped to JSON files.\n    # This avoids directly exposing the full Portal API surface.\n    location = /summary.json {\n      proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/summary;\n      proxy_set_header Host $host;\n      proxy_set_header X-Real-IP $remote_addr;\n      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n      proxy_set_header X-Forwarded-Proto $scheme;\n\n      proxy_cache summarycache;\n      proxy_cache_valid 200 10s;\n      proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;\n      add_header Content-Type \"application/json\";\n    }\n\n    location = /health.json {\n      proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/health;\n      proxy_set_header Host $host;\n      add_header Content-Type \"application/json\";\n    }\n\n    location = /catalog.json {\n      proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/catalog;\n      proxy_set_header Host $host;\n      add_header Content-Type \"application/json\";\n    }\n\n    location = /ingestion.json {\n      proxy_pass http://portal-api.platform.svc.cluster.local:8000/api/ingestion;\n      proxy_set_header Host $host;\n      add_header Content-Type \"application/json\";\n    }\n\n    # Fallback SPA routing\n    location / {\n      try_files $uri /index.html;\n    }\n  }\n}\n","postgres.html":"\u003c!doctype html\u003e\n\u003chtml lang=\"en\"\u003e\n\u003chead\u003e\n  \u003cmeta charset=\"utf-8\"/\u003e\n  \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/\u003e\n  \u003ctitle\u003ePostgres Info\u003c/title\u003e\n  \u003cstyle\u003e\n    body{ font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:20px; background:#0b1220; color:#e8eefc; }\n    .panel{ max-width:860px; margin:0 auto; padding:16px; border:1px solid #203052; border-radius:14px; background:#101a2e; }\n    h1{ margin:0 0 10px 0; font-size:18px; }\n    .muted{ color:#8ea0c0; }\n    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\",\"Courier New\", monospace; }\n    a{ color:#9fc0ff; text-decoration:none; }\n    a:hover{ text-decoration:underline; }\n    ul{ margin:10px 0 0 18px; }\n  \u003c/style\u003e\n\u003c/head\u003e\n\u003cbody\u003e\n  \u003cdiv class=\"panel\"\u003e\n    \u003ch1\u003ePostgres (Info Only)\u003c/h1\u003e\n    \u003cdiv class=\"muted\"\u003e\n      No direct database access is exposed via the portal. Use internal connectivity (within the cluster or VPN/bastion) to connect.\n    \u003c/div\u003e\n    \u003cul\u003e\n      \u003cli\u003eService: \u003cspan class=\"mono\"\u003eopenkpi-postgres.open-kpi.svc.cluster.local:5432\u003c/span\u003e (internal)\u003c/li\u003e\n      \u003cli\u003eCatalog access is provided to the Portal API via a read-only role (\u003cspan class=\"mono\"\u003eportal_ro\u003c/span\u003e).\u003c/li\u003e\n      \u003cli\u003eFor external access, publish a separate controlled endpoint with explicit allowlists and auditing.\u003c/li\u003e\n    \u003c/ul\u003e\n    \u003cdiv style=\"margin-top:14px\"\u003e\n      \u003ca href=\"/\"\u003eBack to Portal\u003c/a\u003e\n    \u003c/div\u003e\n  \u003c/div\u003e\n\u003c/body\u003e\n\u003c/html\u003e\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"portal-ui","namespace":"platform"}}
+    creationTimestamp: "2025-12-25T08:03:18Z"
+    name: portal-ui
+    namespace: platform
+    resourceVersion: "37000"
+    uid: 6399010f-f2cb-43d5-83ba-5afd39463817
+- apiVersion: v1
+  data:
+    nginx.conf: |
+      worker_processes  1;
+      error_log  /dev/stderr warn;
+      pid        /tmp/nginx.pid;
+
+      events { worker_connections 1024; }
+
+      http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+        sendfile      on;
+        keepalive_timeout  65;
+
+        # Late DNS resolution: never crash if API is not yet up
+        resolver 10.43.0.10 valid=10s ipv6=off;
+
+        server {
+          listen 8080;
+          server_name _;
+
+          root /usr/share/nginx/html;
+          index index.html;
+
+          location = /healthz {
+            return 200 "ok\n";
+          }
+
+          location /api/ {
+            set $upstream "http://portal-api.platform.svc.cluster.local:8000";
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 2s;
+            proxy_read_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_next_upstream error timeout http_502 http_503 http_504;
+            proxy_pass $upstream;
+          }
+
+          location / {
+            try_files $uri $uri/ /index.html;
+          }
+        }
+      }
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"nginx.conf":"worker_processes  1;\nerror_log  /dev/stderr warn;\npid        /tmp/nginx.pid;\n\nevents { worker_connections 1024; }\n\nhttp {\n  include       /etc/nginx/mime.types;\n  default_type  application/octet-stream;\n  sendfile      on;\n  keepalive_timeout  65;\n\n  # Late DNS resolution: never crash if API is not yet up\n  resolver 10.43.0.10 valid=10s ipv6=off;\n\n  server {\n    listen 8080;\n    server_name _;\n\n    root /usr/share/nginx/html;\n    index index.html;\n\n    location = /healthz {\n      return 200 \"ok\\n\";\n    }\n\n    location /api/ {\n      set $upstream \"http://portal-api.platform.svc.cluster.local:8000\";\n      proxy_http_version 1.1;\n      proxy_set_header Host $host;\n      proxy_set_header X-Real-IP $remote_addr;\n      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n      proxy_set_header X-Forwarded-Proto $scheme;\n      proxy_connect_timeout 2s;\n      proxy_read_timeout 30s;\n      proxy_send_timeout 30s;\n      proxy_next_upstream error timeout http_502 http_503 http_504;\n      proxy_pass $upstream;\n    }\n\n    location / {\n      try_files $uri $uri/ /index.html;\n    }\n  }\n}\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"portal-ui-nginx","namespace":"platform"}}
+    creationTimestamp: "2025-12-25T10:40:50Z"
+    name: portal-ui-nginx
+    namespace: platform
+    resourceVersion: "37335"
+    uid: f99695f6-440c-4898-b397-7407e2ede605
+- apiVersion: v1
+  data:
+    index.html: |
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width,initial-scale=1"/>
+        <title>OpenKPI Portal</title>
+        <style>
+          body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b1220; color: #e6eaf2; }
+          header { padding: 18px 22px; background: #0f1a33; border-bottom: 1px solid rgba(255,255,255,0.08); }
+          h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }
+          main { padding: 18px 22px; display: grid; gap: 14px; }
+          .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+          .card { background: #0f1a33; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 12px; }
+          .card h2 { font-size: 14px; margin: 0 0 8px 0; color: #cfe0ff; }
+          .k { opacity: 0.8; }
+          .ok { color: #58d68d; }
+          .bad { color: #ff6b6b; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { padding: 6px 6px; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
+          th { text-align: left; opacity: 0.85; }
+          a { color: #8fb5ff; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+          .small { font-size: 12px; opacity: 0.85; }
+          .muted { opacity: 0.7; }
+          .row { display:flex; gap:10px; flex-wrap:wrap; }
+          .pill { padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>OpenKPI Portal</h1>
+          <div class="small muted" id="statusline">Loading…</div>
+        </header>
+
+        <main>
+          <div class="grid">
+            <div class="card">
+              <h2>Overall platform status</h2>
+              <div class="row" id="overall"></div>
+            </div>
+            <div class="card">
+              <h2>Deep links</h2>
+              <div class="small">
+                <div><span class="k">Portal API:</span> <a href="/api/health" target="_blank" rel="noreferrer">/api/health</a></div>
+                <div><span class="k">Airbyte:</span> <a id="airbyteLink" href="#" target="_blank" rel="noreferrer">—</a></div>
+                <div><span class="k">MinIO:</span> <a id="minioLink" href="#" target="_blank" rel="noreferrer">—</a></div>
+                <div><span class="k">n8n:</span> <a id="n8nLink" href="#" target="_blank" rel="noreferrer">—</a></div>
+                <div><span class="k">Zammad:</span> <a id="zammadLink" href="#" target="_blank" rel="noreferrer">—</a></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <h2>Per-app health (pods/deployments)</h2>
+              <div id="apps"></div>
+            </div>
+            <div class="card">
+              <h2>Data catalogue snapshot</h2>
+              <div id="catalog"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Last ingestion summary (Airbyte)</h2>
+            <div id="ingestion"></div>
+          </div>
+        </main>
+
+        <script>
+          function esc(s){ return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+          function pill(text, ok=true){ return '<span class="pill ' + (ok?'ok':'bad') + '">' + esc(text) + '</span>'; }
+
+          function linkFromHost(host) {
+            if (!host) return "—";
+            return window.location.protocol + "//" + host + "/";
+          }
+
+          async function load() {
+            const statusline = document.getElementById("statusline");
+            const overall = document.getElementById("overall");
+            const apps = document.getElementById("apps");
+            const catalog = document.getElementById("catalog");
+            const ingestion = document.getElementById("ingestion");
+
+            let summary = null;
+            try {
+              const r = await fetch("/api/summary", { cache: "no-store" });
+              summary = await r.json();
+              statusline.textContent = "API reachable. Updated: " + new Date().toISOString();
+            } catch (e) {
+              statusline.innerHTML = '<span class="bad">API unreachable</span> (UI stays up; retrying)';
+              overall.innerHTML = pill("API down", false);
+              apps.innerHTML = '<div class="small muted">No data</div>';
+              catalog.innerHTML = '<div class="small muted">No data</div>';
+              ingestion.innerHTML = '<div class="small muted">No data</div>';
+              return;
+            }
+
+            overall.innerHTML = pill("API OK", true);
+
+            const ns = (summary.k8s && summary.k8s.namespaces) ? summary.k8s.namespaces : [];
+            const nsMap = {};
+            ns.forEach(x => nsMap[x.name] = x);
+
+            function renderNsCard(name, data) {
+              const pods = (data.pods || []);
+              const deps = (data.deployments || []);
+              const stss = (data.statefulsets || []);
+
+              const badPods = pods.filter(p => (p.phase !== "Running" && p.phase !== "Succeeded"));
+              const restartSum = pods.reduce((a,p)=>a+(p.restarts||0),0);
+
+              const lines = [];
+              lines.push('<div class="row">' + pill(name, badPods.length===0) + pill("pods: " + pods.length, true) + pill("restarts: " + restartSum, restartSum===0) + '</div>');
+              if (deps.length) {
+                lines.push('<div class="small"><span class="k">deployments</span><ul>');
+                deps.slice(0,12).forEach(d => lines.push('<li>' + esc(d.name) + ' <span class="muted">(' + esc(d.ready) + ')</span></li>'));
+                lines.push('</ul></div>');
+              }
+              if (stss.length) {
+                lines.push('<div class="small"><span class="k">statefulsets</span><ul>');
+                stss.slice(0,12).forEach(s => lines.push('<li>' + esc(s.name) + ' <span class="muted">(' + esc(s.ready) + ')</span></li>'));
+                lines.push('</ul></div>');
+              }
+              return '<div class="card" style="margin:0 0 10px 0;">' + lines.join("") + '</div>';
+            }
+
+            const targets = ["open-kpi","airbyte","n8n","tickets","transform","platform"];
+            apps.innerHTML = targets
+              .filter(n => nsMap[n])
+              .map(n => renderNsCard(n, nsMap[n]))
+              .join("") || '<div class="small muted">No namespaces visible</div>';
+
+            const pg = (summary.catalog && summary.catalog.postgres) ? summary.catalog.postgres : {};
+            const mi = (summary.catalog && summary.catalog.minio) ? summary.catalog.minio : {};
+
+            const pgOk = !!pg.ok;
+            const miOk = !!mi.ok;
+
+            let catHtml = '<div class="row">' + pill("Postgres: " + (pgOk?"OK":"N/A"), pgOk) + pill("MinIO: " + (miOk?"OK":"N/A"), miOk) + '</div>';
+
+            catHtml += '<div class="small" style="margin-top:8px;"><div class="k">Postgres schemas</div>';
+            if (pgOk) {
+              catHtml += '<div class="muted">' + esc((pg.schemas||[]).slice(0,30).join(", ") || "—") + '</div>';
+              catHtml += '<div class="k" style="margin-top:6px;">Tables (first 50)</div>';
+              const rows = (pg.tables||[]).slice(0,50).map(t => '<tr><td>'+esc(t.schema)+'</td><td>'+esc(t.table)+'</td></tr>').join("");
+              catHtml += '<table><thead><tr><th>Schema</th><th>Table</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            } else {
+              catHtml += '<div class="muted">' + esc(pg.error || "Unavailable") + '</div>';
+            }
+            catHtml += '</div>';
+
+            catHtml += '<div class="small" style="margin-top:10px;"><div class="k">MinIO buckets</div>';
+            if (miOk) {
+              const rows = (mi.buckets||[]).slice(0,50).map(b => '<tr><td>'+esc(b.name)+'</td><td class="muted">'+esc(b.created||"")+'</td></tr>').join("");
+              catHtml += '<table><thead><tr><th>Bucket</th><th>Created</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            } else {
+              catHtml += '<div class="muted">' + esc(mi.error || "Unavailable") + '</div>';
+            }
+            catHtml += '</div>';
+
+            catalog.innerHTML = catHtml;
+
+            const ing = summary.ingestion || {};
+            const ab = ing.airbyte || {};
+            const abPods = ab.pods || [];
+            const abEv = ab.events || [];
+
+            let ingHtml = '<div class="row">' + pill("Airbyte pods: " + abPods.length, true) + '</div>';
+            if (abPods.length) {
+              const rows = abPods.slice(0,30).map(p => '<tr><td>'+esc(p.name)+'</td><td>'+esc(p.phase)+'</td><td>'+esc(p.restarts||0)+'</td></tr>').join("");
+              ingHtml += '<table><thead><tr><th>Pod</th><th>Phase</th><th>Restarts</th></tr></thead><tbody>' + rows + '</tbody></table>';
+            }
+            if (abEv.length) {
+              ingHtml += '<div class="small" style="margin-top:10px;"><div class="k">Recent events</div><ul>';
+              abEv.slice(0,12).forEach(e => ingHtml += '<li><span class="muted">'+esc(e.ts||"")+'</span> ' + esc(e.reason||"") + ' — ' + esc(e.message||"") + '</li>');
+              ingHtml += '</ul></div>';
+            }
+            ingestion.innerHTML = ingHtml;
+
+            // Deep links (host inference only; safe even if absent)
+            // Prefer commonly used subdomains; if not present in env, show portal host base.
+            const base = window.location.host;
+            document.getElementById("airbyteLink").textContent = "airbyte." + base;
+            document.getElementById("airbyteLink").href = window.location.protocol + "//" + "airbyte." + base + "/";
+            document.getElementById("minioLink").textContent = "minio." + base;
+            document.getElementById("minioLink").href = window.location.protocol + "//" + "minio." + base + "/";
+            document.getElementById("n8nLink").textContent = "n8n." + base;
+            document.getElementById("n8nLink").href = window.location.protocol + "//" + "n8n." + base + "/";
+            document.getElementById("zammadLink").textContent = "zammad." + base;
+            document.getElementById("zammadLink").href = window.location.protocol + "//" + "zammad." + base + "/";
+          }
+
+          load();
+          setInterval(load, 15000);
+        </script>
+      </body>
+      </html>
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"index.html":"\u003c!doctype html\u003e\n\u003chtml lang=\"en\"\u003e\n\u003chead\u003e\n  \u003cmeta charset=\"utf-8\"/\u003e\n  \u003cmeta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/\u003e\n  \u003ctitle\u003eOpenKPI Portal\u003c/title\u003e\n  \u003cstyle\u003e\n    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b1220; color: #e6eaf2; }\n    header { padding: 18px 22px; background: #0f1a33; border-bottom: 1px solid rgba(255,255,255,0.08); }\n    h1 { font-size: 18px; margin: 0; letter-spacing: 0.3px; }\n    main { padding: 18px 22px; display: grid; gap: 14px; }\n    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }\n    .card { background: #0f1a33; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 12px; }\n    .card h2 { font-size: 14px; margin: 0 0 8px 0; color: #cfe0ff; }\n    .k { opacity: 0.8; }\n    .ok { color: #58d68d; }\n    .bad { color: #ff6b6b; }\n    table { width: 100%; border-collapse: collapse; font-size: 12px; }\n    th, td { padding: 6px 6px; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }\n    th { text-align: left; opacity: 0.85; }\n    a { color: #8fb5ff; text-decoration: none; }\n    a:hover { text-decoration: underline; }\n    .small { font-size: 12px; opacity: 0.85; }\n    .muted { opacity: 0.7; }\n    .row { display:flex; gap:10px; flex-wrap:wrap; }\n    .pill { padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 12px; }\n  \u003c/style\u003e\n\u003c/head\u003e\n\u003cbody\u003e\n  \u003cheader\u003e\n    \u003ch1\u003eOpenKPI Portal\u003c/h1\u003e\n    \u003cdiv class=\"small muted\" id=\"statusline\"\u003eLoading…\u003c/div\u003e\n  \u003c/header\u003e\n\n  \u003cmain\u003e\n    \u003cdiv class=\"grid\"\u003e\n      \u003cdiv class=\"card\"\u003e\n        \u003ch2\u003eOverall platform status\u003c/h2\u003e\n        \u003cdiv class=\"row\" id=\"overall\"\u003e\u003c/div\u003e\n      \u003c/div\u003e\n      \u003cdiv class=\"card\"\u003e\n        \u003ch2\u003eDeep links\u003c/h2\u003e\n        \u003cdiv class=\"small\"\u003e\n          \u003cdiv\u003e\u003cspan class=\"k\"\u003ePortal API:\u003c/span\u003e \u003ca href=\"/api/health\" target=\"_blank\" rel=\"noreferrer\"\u003e/api/health\u003c/a\u003e\u003c/div\u003e\n          \u003cdiv\u003e\u003cspan class=\"k\"\u003eAirbyte:\u003c/span\u003e \u003ca id=\"airbyteLink\" href=\"#\" target=\"_blank\" rel=\"noreferrer\"\u003e—\u003c/a\u003e\u003c/div\u003e\n          \u003cdiv\u003e\u003cspan class=\"k\"\u003eMinIO:\u003c/span\u003e \u003ca id=\"minioLink\" href=\"#\" target=\"_blank\" rel=\"noreferrer\"\u003e—\u003c/a\u003e\u003c/div\u003e\n          \u003cdiv\u003e\u003cspan class=\"k\"\u003en8n:\u003c/span\u003e \u003ca id=\"n8nLink\" href=\"#\" target=\"_blank\" rel=\"noreferrer\"\u003e—\u003c/a\u003e\u003c/div\u003e\n          \u003cdiv\u003e\u003cspan class=\"k\"\u003eZammad:\u003c/span\u003e \u003ca id=\"zammadLink\" href=\"#\" target=\"_blank\" rel=\"noreferrer\"\u003e—\u003c/a\u003e\u003c/div\u003e\n        \u003c/div\u003e\n      \u003c/div\u003e\n    \u003c/div\u003e\n\n    \u003cdiv class=\"grid\"\u003e\n      \u003cdiv class=\"card\"\u003e\n        \u003ch2\u003ePer-app health (pods/deployments)\u003c/h2\u003e\n        \u003cdiv id=\"apps\"\u003e\u003c/div\u003e\n      \u003c/div\u003e\n      \u003cdiv class=\"card\"\u003e\n        \u003ch2\u003eData catalogue snapshot\u003c/h2\u003e\n        \u003cdiv id=\"catalog\"\u003e\u003c/div\u003e\n      \u003c/div\u003e\n    \u003c/div\u003e\n\n    \u003cdiv class=\"card\"\u003e\n      \u003ch2\u003eLast ingestion summary (Airbyte)\u003c/h2\u003e\n      \u003cdiv id=\"ingestion\"\u003e\u003c/div\u003e\n    \u003c/div\u003e\n  \u003c/main\u003e\n\n  \u003cscript\u003e\n    function esc(s){ return String(s).replaceAll(\"\u0026\",\"\u0026amp;\").replaceAll(\"\u003c\",\"\u0026lt;\").replaceAll(\"\u003e\",\"\u0026gt;\"); }\n    function pill(text, ok=true){ return '\u003cspan class=\"pill ' + (ok?'ok':'bad') + '\"\u003e' + esc(text) + '\u003c/span\u003e'; }\n\n    function linkFromHost(host) {\n      if (!host) return \"—\";\n      return window.location.protocol + \"//\" + host + \"/\";\n    }\n\n    async function load() {\n      const statusline = document.getElementById(\"statusline\");\n      const overall = document.getElementById(\"overall\");\n      const apps = document.getElementById(\"apps\");\n      const catalog = document.getElementById(\"catalog\");\n      const ingestion = document.getElementById(\"ingestion\");\n\n      let summary = null;\n      try {\n        const r = await fetch(\"/api/summary\", { cache: \"no-store\" });\n        summary = await r.json();\n        statusline.textContent = \"API reachable. Updated: \" + new Date().toISOString();\n      } catch (e) {\n        statusline.innerHTML = '\u003cspan class=\"bad\"\u003eAPI unreachable\u003c/span\u003e (UI stays up; retrying)';\n        overall.innerHTML = pill(\"API down\", false);\n        apps.innerHTML = '\u003cdiv class=\"small muted\"\u003eNo data\u003c/div\u003e';\n        catalog.innerHTML = '\u003cdiv class=\"small muted\"\u003eNo data\u003c/div\u003e';\n        ingestion.innerHTML = '\u003cdiv class=\"small muted\"\u003eNo data\u003c/div\u003e';\n        return;\n      }\n\n      overall.innerHTML = pill(\"API OK\", true);\n\n      const ns = (summary.k8s \u0026\u0026 summary.k8s.namespaces) ? summary.k8s.namespaces : [];\n      const nsMap = {};\n      ns.forEach(x =\u003e nsMap[x.name] = x);\n\n      function renderNsCard(name, data) {\n        const pods = (data.pods || []);\n        const deps = (data.deployments || []);\n        const stss = (data.statefulsets || []);\n\n        const badPods = pods.filter(p =\u003e (p.phase !== \"Running\" \u0026\u0026 p.phase !== \"Succeeded\"));\n        const restartSum = pods.reduce((a,p)=\u003ea+(p.restarts||0),0);\n\n        const lines = [];\n        lines.push('\u003cdiv class=\"row\"\u003e' + pill(name, badPods.length===0) + pill(\"pods: \" + pods.length, true) + pill(\"restarts: \" + restartSum, restartSum===0) + '\u003c/div\u003e');\n        if (deps.length) {\n          lines.push('\u003cdiv class=\"small\"\u003e\u003cspan class=\"k\"\u003edeployments\u003c/span\u003e\u003cul\u003e');\n          deps.slice(0,12).forEach(d =\u003e lines.push('\u003cli\u003e' + esc(d.name) + ' \u003cspan class=\"muted\"\u003e(' + esc(d.ready) + ')\u003c/span\u003e\u003c/li\u003e'));\n          lines.push('\u003c/ul\u003e\u003c/div\u003e');\n        }\n        if (stss.length) {\n          lines.push('\u003cdiv class=\"small\"\u003e\u003cspan class=\"k\"\u003estatefulsets\u003c/span\u003e\u003cul\u003e');\n          stss.slice(0,12).forEach(s =\u003e lines.push('\u003cli\u003e' + esc(s.name) + ' \u003cspan class=\"muted\"\u003e(' + esc(s.ready) + ')\u003c/span\u003e\u003c/li\u003e'));\n          lines.push('\u003c/ul\u003e\u003c/div\u003e');\n        }\n        return '\u003cdiv class=\"card\" style=\"margin:0 0 10px 0;\"\u003e' + lines.join(\"\") + '\u003c/div\u003e';\n      }\n\n      const targets = [\"open-kpi\",\"airbyte\",\"n8n\",\"tickets\",\"transform\",\"platform\"];\n      apps.innerHTML = targets\n        .filter(n =\u003e nsMap[n])\n        .map(n =\u003e renderNsCard(n, nsMap[n]))\n        .join(\"\") || '\u003cdiv class=\"small muted\"\u003eNo namespaces visible\u003c/div\u003e';\n\n      const pg = (summary.catalog \u0026\u0026 summary.catalog.postgres) ? summary.catalog.postgres : {};\n      const mi = (summary.catalog \u0026\u0026 summary.catalog.minio) ? summary.catalog.minio : {};\n\n      const pgOk = !!pg.ok;\n      const miOk = !!mi.ok;\n\n      let catHtml = '\u003cdiv class=\"row\"\u003e' + pill(\"Postgres: \" + (pgOk?\"OK\":\"N/A\"), pgOk) + pill(\"MinIO: \" + (miOk?\"OK\":\"N/A\"), miOk) + '\u003c/div\u003e';\n\n      catHtml += '\u003cdiv class=\"small\" style=\"margin-top:8px;\"\u003e\u003cdiv class=\"k\"\u003ePostgres schemas\u003c/div\u003e';\n      if (pgOk) {\n        catHtml += '\u003cdiv class=\"muted\"\u003e' + esc((pg.schemas||[]).slice(0,30).join(\", \") || \"—\") + '\u003c/div\u003e';\n        catHtml += '\u003cdiv class=\"k\" style=\"margin-top:6px;\"\u003eTables (first 50)\u003c/div\u003e';\n        const rows = (pg.tables||[]).slice(0,50).map(t =\u003e '\u003ctr\u003e\u003ctd\u003e'+esc(t.schema)+'\u003c/td\u003e\u003ctd\u003e'+esc(t.table)+'\u003c/td\u003e\u003c/tr\u003e').join(\"\");\n        catHtml += '\u003ctable\u003e\u003cthead\u003e\u003ctr\u003e\u003cth\u003eSchema\u003c/th\u003e\u003cth\u003eTable\u003c/th\u003e\u003c/tr\u003e\u003c/thead\u003e\u003ctbody\u003e' + rows + '\u003c/tbody\u003e\u003c/table\u003e';\n      } else {\n        catHtml += '\u003cdiv class=\"muted\"\u003e' + esc(pg.error || \"Unavailable\") + '\u003c/div\u003e';\n      }\n      catHtml += '\u003c/div\u003e';\n\n      catHtml += '\u003cdiv class=\"small\" style=\"margin-top:10px;\"\u003e\u003cdiv class=\"k\"\u003eMinIO buckets\u003c/div\u003e';\n      if (miOk) {\n        const rows = (mi.buckets||[]).slice(0,50).map(b =\u003e '\u003ctr\u003e\u003ctd\u003e'+esc(b.name)+'\u003c/td\u003e\u003ctd class=\"muted\"\u003e'+esc(b.created||\"\")+'\u003c/td\u003e\u003c/tr\u003e').join(\"\");\n        catHtml += '\u003ctable\u003e\u003cthead\u003e\u003ctr\u003e\u003cth\u003eBucket\u003c/th\u003e\u003cth\u003eCreated\u003c/th\u003e\u003c/tr\u003e\u003c/thead\u003e\u003ctbody\u003e' + rows + '\u003c/tbody\u003e\u003c/table\u003e';\n      } else {\n        catHtml += '\u003cdiv class=\"muted\"\u003e' + esc(mi.error || \"Unavailable\") + '\u003c/div\u003e';\n      }\n      catHtml += '\u003c/div\u003e';\n\n      catalog.innerHTML = catHtml;\n\n      const ing = summary.ingestion || {};\n      const ab = ing.airbyte || {};\n      const abPods = ab.pods || [];\n      const abEv = ab.events || [];\n\n      let ingHtml = '\u003cdiv class=\"row\"\u003e' + pill(\"Airbyte pods: \" + abPods.length, true) + '\u003c/div\u003e';\n      if (abPods.length) {\n        const rows = abPods.slice(0,30).map(p =\u003e '\u003ctr\u003e\u003ctd\u003e'+esc(p.name)+'\u003c/td\u003e\u003ctd\u003e'+esc(p.phase)+'\u003c/td\u003e\u003ctd\u003e'+esc(p.restarts||0)+'\u003c/td\u003e\u003c/tr\u003e').join(\"\");\n        ingHtml += '\u003ctable\u003e\u003cthead\u003e\u003ctr\u003e\u003cth\u003ePod\u003c/th\u003e\u003cth\u003ePhase\u003c/th\u003e\u003cth\u003eRestarts\u003c/th\u003e\u003c/tr\u003e\u003c/thead\u003e\u003ctbody\u003e' + rows + '\u003c/tbody\u003e\u003c/table\u003e';\n      }\n      if (abEv.length) {\n        ingHtml += '\u003cdiv class=\"small\" style=\"margin-top:10px;\"\u003e\u003cdiv class=\"k\"\u003eRecent events\u003c/div\u003e\u003cul\u003e';\n        abEv.slice(0,12).forEach(e =\u003e ingHtml += '\u003cli\u003e\u003cspan class=\"muted\"\u003e'+esc(e.ts||\"\")+'\u003c/span\u003e ' + esc(e.reason||\"\") + ' — ' + esc(e.message||\"\") + '\u003c/li\u003e');\n        ingHtml += '\u003c/ul\u003e\u003c/div\u003e';\n      }\n      ingestion.innerHTML = ingHtml;\n\n      // Deep links (host inference only; safe even if absent)\n      // Prefer commonly used subdomains; if not present in env, show portal host base.\n      const base = window.location.host;\n      document.getElementById(\"airbyteLink\").textContent = \"airbyte.\" + base;\n      document.getElementById(\"airbyteLink\").href = window.location.protocol + \"//\" + \"airbyte.\" + base + \"/\";\n      document.getElementById(\"minioLink\").textContent = \"minio.\" + base;\n      document.getElementById(\"minioLink\").href = window.location.protocol + \"//\" + \"minio.\" + base + \"/\";\n      document.getElementById(\"n8nLink\").textContent = \"n8n.\" + base;\n      document.getElementById(\"n8nLink\").href = window.location.protocol + \"//\" + \"n8n.\" + base + \"/\";\n      document.getElementById(\"zammadLink\").textContent = \"zammad.\" + base;\n      document.getElementById(\"zammadLink\").href = window.location.protocol + \"//\" + \"zammad.\" + base + \"/\";\n    }\n\n    load();\n    setInterval(load, 15000);\n  \u003c/script\u003e\n\u003c/body\u003e\n\u003c/html\u003e\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"portal-ui-web","namespace":"platform"}}
+    creationTimestamp: "2025-12-25T10:40:50Z"
+    name: portal-ui-web
+    namespace: platform
+    resourceVersion: "37336"
+    uid: 325eff62-8576-4872-b501-9e3751bae4c4
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"batch/v1","kind":"Job","metadata":{"annotations":{},"name":"portal-minio-ro","namespace":"platform"},"spec":{"backoffLimit":0,"template":{"spec":{"containers":[{"args":["set -e\n\nif [ -z \"${MINIO_ROOT_USER:-}\" ] || [ -z \"${MINIO_ROOT_PASSWORD:-}\" ]; then\n  echo \"Missing MinIO superuser secret; skipping\"\n  exit 0\nfi\n\nmc alias set openkpi \"${MINIO_ENDPOINT}\" \"${MINIO_ROOT_USER}\" \"${MINIO_ROOT_PASSWORD}\" \u003e/dev/null\n\nPOLICY_JSON='{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetBucketLocation\",\"s3:ListAllMyBuckets\",\"s3:ListBucket\"],\"Resource\":[\"arn:aws:s3:::*\"]},{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::*/*\"]}]}'\nprintf \"%s\" \"$POLICY_JSON\" | mc admin policy add openkpi portal-readonly - \u003e/dev/null 2\u003e\u00261 || true\n\nmc admin user add openkpi \"$RO_USER\" \"$RO_PASS\" \u003e/dev/null 2\u003e\u00261 || true\nmc admin policy attach openkpi portal-readonly --user \"$RO_USER\" \u003e/dev/null 2\u003e\u00261 || true\n\necho \"MinIO RO ensured\""],"command":["/bin/sh","-lc"],"env":[{"name":"MINIO_ENDPOINT","value":"http://openkpi-minio.open-kpi.svc.cluster.local:9000"},{"name":"MINIO_ROOT_USER","valueFrom":{"secretKeyRef":{"key":"MINIO_ROOT_USER","name":"openkpi-minio-secret","optional":true}}},{"name":"MINIO_ROOT_PASSWORD","valueFrom":{"secretKeyRef":{"key":"MINIO_ROOT_PASSWORD","name":"openkpi-minio-secret","optional":true}}},{"name":"RO_USER","valueFrom":{"secretKeyRef":{"key":"MINIO_RO_USER","name":"portal-catalog-secret"}}},{"name":"RO_PASS","valueFrom":{"secretKeyRef":{"key":"MINIO_RO_PASSWORD","name":"portal-catalog-secret"}}}],"image":"minio/mc:RELEASE.2025-07-23T15-54-02Z","name":"mc"}],"restartPolicy":"Never"}},"ttlSecondsAfterFinished":300}}
+    creationTimestamp: "2025-12-25T16:16:27Z"
+    generation: 1
+    labels:
+      batch.kubernetes.io/controller-uid: ac3890d5-01a0-486b-9372-1c71521cb741
+      batch.kubernetes.io/job-name: portal-minio-ro
+      controller-uid: ac3890d5-01a0-486b-9372-1c71521cb741
+      job-name: portal-minio-ro
+    name: portal-minio-ro
+    namespace: platform
+    resourceVersion: "49582"
+    uid: ac3890d5-01a0-486b-9372-1c71521cb741
+  spec:
+    backoffLimit: 0
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: ac3890d5-01a0-486b-9372-1c71521cb741
+    suspend: false
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          batch.kubernetes.io/controller-uid: ac3890d5-01a0-486b-9372-1c71521cb741
+          batch.kubernetes.io/job-name: portal-minio-ro
+          controller-uid: ac3890d5-01a0-486b-9372-1c71521cb741
+          job-name: portal-minio-ro
+      spec:
+        containers:
+        - args:
+          - |-
+            set -e
+
+            if [ -z "${MINIO_ROOT_USER:-}" ] || [ -z "${MINIO_ROOT_PASSWORD:-}" ]; then
+              echo "Missing MinIO superuser secret; skipping"
+              exit 0
+            fi
+
+            mc alias set openkpi "${MINIO_ENDPOINT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null
+
+            POLICY_JSON='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListAllMyBuckets","s3:ListBucket"],"Resource":["arn:aws:s3:::*"]},{"Effect":"Allow","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::*/*"]}]}'
+            printf "%s" "$POLICY_JSON" | mc admin policy add openkpi portal-readonly - >/dev/null 2>&1 || true
+
+            mc admin user add openkpi "$RO_USER" "$RO_PASS" >/dev/null 2>&1 || true
+            mc admin policy attach openkpi portal-readonly --user "$RO_USER" >/dev/null 2>&1 || true
+
+            echo "MinIO RO ensured"
+          command:
+          - /bin/sh
+          - -lc
+          env:
+          - name: MINIO_ENDPOINT
+            value: http://openkpi-minio.open-kpi.svc.cluster.local:9000
+          - name: MINIO_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ROOT_USER
+                name: openkpi-minio-secret
+                optional: true
+          - name: MINIO_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ROOT_PASSWORD
+                name: openkpi-minio-secret
+                optional: true
+          - name: RO_USER
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_RO_USER
+                name: portal-catalog-secret
+          - name: RO_PASS
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_RO_PASSWORD
+                name: portal-catalog-secret
+          image: minio/mc:RELEASE.2025-07-23T15-54-02Z
+          imagePullPolicy: IfNotPresent
+          name: mc
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+    ttlSecondsAfterFinished: 300
+  status:
+    active: 1
+    ready: 0
+    startTime: "2025-12-25T16:16:27Z"
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: cert-manager.io/v1
+  kind: Certificate
+  metadata:
+    creationTimestamp: "2025-12-25T12:53:50Z"
+    generation: 1
+    name: portal-tls
+    namespace: platform
+    ownerReferences:
+    - apiVersion: networking.k8s.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Ingress
+      name: portal
+      uid: 887a6fab-8ff3-483b-bb7b-a231c9440f19
+    resourceVersion: "42363"
+    uid: 9881826a-866b-42c5-a8ca-18c82d0a5f32
+  spec:
+    dnsNames:
+    - portal.lake3.opendatalake.com
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: letsencrypt-http01
+    secretName: portal-tls
+    usages:
+    - digital signature
+    - key encipherment
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-25T12:54:16Z"
+      message: Certificate is up to date and has not expired
+      observedGeneration: 1
+      reason: Ready
+      status: "True"
+      type: Ready
+    notAfter: "2026-03-25T11:55:44Z"
+    notBefore: "2025-12-25T11:55:45Z"
+    renewalTime: "2026-02-23T11:55:44Z"
+    revision: 1
+- apiVersion: acme.cert-manager.io/v1
+  kind: Order
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: portal-tls
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: portal-tls-dskcl
+    creationTimestamp: "2025-12-25T12:53:50Z"
+    generation: 1
+    name: portal-tls-1-3053714584
+    namespace: platform
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: CertificateRequest
+      name: portal-tls-1
+      uid: b7e128cf-bd79-4e67-959b-818fe467ecdb
+    resourceVersion: "42353"
+    uid: 4c69885a-eada-4b1a-a741-830446b942ef
+  spec:
+    dnsNames:
+    - portal.lake3.opendatalake.com
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: letsencrypt-http01
+    request: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQ2t6Q0NBWHNDQVFBd0FEQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQURnZ0VQQURDQ0FRb0NnZ0VCQUxMdApTd3NHY0hqQkptQXQ2VVd2YTZOMm1QTG43MCtRdHlGcDR1MllybG5TUTIreDN0U0c3Rjd5SlJLcFlOK0FFR0d2ClpCNHBuODlhK0JxWC9ra0Q5bGk4N3NJUDdGVDFFSFNnWkdvR01iSDk3ZStqeTFYU0RKK3dsQW5Udm9HeGVDeXkKVmZmTzFJRDllSGdNemRxTGNWNjlNdGdCWlBJRGMybFlXN3RyRzJQay8xbHozU1BUMmdaMk5qZGdLVmRhN0ViQQpsNjB5UzltVHZtYUVqWEg2WWRQZ3ZMWlg2K1VFZ0V6dUMvTHRUUGI5OC9xTTN3bG9BYm92dXJ1S1c0Z1liNURlClhKZTBwc3h3eWNTMEN1OTVrRVVZNktkczR6MXpzajVyVXNPMERmN0FNbmxGSjBEWUNCcnpDUHlNNVVDelRYME0Kc0hwYkMyT3MyTURrbFRuc1Jmc0NBd0VBQWFCT01Fd0dDU3FHU0liM0RRRUpEakUvTUQwd0t3WURWUjBSQVFILwpCQ0V3SDRJZGNHOXlkR0ZzTG14aGEyVXpMbTl3Wlc1a1lYUmhiR0ZyWlM1amIyMHdEZ1lEVlIwUEFRSC9CQVFECkFnV2dNQTBHQ1NxR1NJYjNEUUVCQ3dVQUE0SUJBUUJJMUlCdGlDTHZBMWVoMWdsVVNBdktPc2hUMEo5UW90N1MKdXpTVGlheEV2N0UwbW82ZUxOczVuRHF1djB4MFZPMFRxMllMdWVseTVHOUFIRndwUkZMdStzcnRNdTRyRFFRSgp1VnFWYVE1NVBCcWx5aklJK2JHQnYra05MMW9JVjYvTkdQSlU0dVZtdXJvR3dGWnFqaHpzc1RNbjYwM3RTMkl6CmtkVXVINmtHR2x1RzdvV2VJMUJTMkpYUEoxa3hsOXgzcmppVnpIeXN3SHk1Z3N4OXlCa3lZd2wxWUNjVzkwWE0KUnlRMVNQMXJGTXBKOTg1OXRORjJqU25mK0d4aTM1TzVNN3J2MHFSRXZWQnBES1MzZURrR1NnT3RFV3dZbHFIbQpVUjh4ZzhuenkrU2Fibi94RTY0c0Qzc1o0czdGLzhpY2JtS1J4WURzeGFZZDUvSld1elY1Ci0tLS0tRU5EIENFUlRJRklDQVRFIFJFUVVFU1QtLS0tLQo=
+  status:
+    authorizations:
+    - challenges:
+      - token: lKELdYYO2GByM5JSYEebfPYA9TwaRO7g9_ryxwJenhA
+        type: http-01
+        url: https://acme-v02.api.letsencrypt.org/acme/chall/2906392776/632853178466/eCjN1g
+      - token: lKELdYYO2GByM5JSYEebfPYA9TwaRO7g9_ryxwJenhA
+        type: dns-01
+        url: https://acme-v02.api.letsencrypt.org/acme/chall/2906392776/632853178466/70UmhQ
+      - token: lKELdYYO2GByM5JSYEebfPYA9TwaRO7g9_ryxwJenhA
+        type: tls-alpn-01
+        url: https://acme-v02.api.letsencrypt.org/acme/chall/2906392776/632853178466/DkY-KA
+      identifier: portal.lake3.opendatalake.com
+      initialState: pending
+      url: https://acme-v02.api.letsencrypt.org/acme/authz/2906392776/632853178466
+      wildcard: false
+    certificate: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZJRENDQkFpZ0F3SUJBZ0lTQmlxZHNpNlZMZCtSUjJ2VTNDbUh6K0I0TUEwR0NTcUdTSWIzRFFFQkN3VUEKTURNeEN6QUpCZ05WQkFZVEFsVlRNUll3RkFZRFZRUUtFdzFNWlhRbmN5QkZibU55ZVhCME1Rd3dDZ1lEVlFRRApFd05TTVRNd0hoY05NalV4TWpJMU1URTFOVFExV2hjTk1qWXdNekkxTVRFMU5UUTBXakFvTVNZd0pBWURWUVFECkV4MXdiM0owWVd3dWJHRnJaVE11YjNCbGJtUmhkR0ZzWVd0bExtTnZiVENDQVNJd0RRWUpLb1pJaHZjTkFRRUIKQlFBRGdnRVBBRENDQVFvQ2dnRUJBTEx0U3dzR2NIakJKbUF0NlVXdmE2TjJtUExuNzArUXR5RnA0dTJZcmxuUwpRMit4M3RTRzdGN3lKUktwWU4rQUVHR3ZaQjRwbjg5YStCcVgva2tEOWxpODdzSVA3RlQxRUhTZ1pHb0dNYkg5CjdlK2p5MVhTREord2xBblR2b0d4ZUN5eVZmZk8xSUQ5ZUhnTXpkcUxjVjY5TXRnQlpQSURjMmxZVzd0ckcyUGsKLzFsejNTUFQyZ1oyTmpkZ0tWZGE3RWJBbDYweVM5bVR2bWFFalhINllkUGd2TFpYNitVRWdFenVDL0x0VFBiOQo4L3FNM3dsb0Fib3Z1cnVLVzRnWWI1RGVYSmUwcHN4d3ljUzBDdTk1a0VVWTZLZHM0ejF6c2o1clVzTzBEZjdBCk1ubEZKMERZQ0JyekNQeU01VUN6VFgwTXNIcGJDMk9zMk1Ea2xUbnNSZnNDQXdFQUFhT0NBamN3Z2dJek1BNEcKQTFVZER3RUIvd1FFQXdJRm9EQWRCZ05WSFNVRUZqQVVCZ2dyQmdFRkJRY0RBUVlJS3dZQkJRVUhBd0l3REFZRApWUjBUQVFIL0JBSXdBREFkQmdOVkhRNEVGZ1FVTWIzeTFvOVBjL1lLMWJiVnFzOHkyUng5Rmlzd0h3WURWUjBqCkJCZ3dGb0FVNTZ1ZkR5d3pvRlBUWGs5NHlMS0VEanZXa2pNd013WUlLd1lCQlFVSEFRRUVKekFsTUNNR0NDc0cKQVFVRkJ6QUNoaGRvZEhSd09pOHZjakV6TG1rdWJHVnVZM0l1YjNKbkx6QW9CZ05WSFJFRUlUQWZnaDF3YjNKMApZV3d1YkdGclpUTXViM0JsYm1SaGRHRnNZV3RsTG1OdmJUQVRCZ05WSFNBRUREQUtNQWdHQm1lQkRBRUNBVEF2CkJnTlZIUjhFS0RBbU1DU2dJcUFnaGg1b2RIUndPaTh2Y2pFekxtTXViR1Z1WTNJdWIzSm5MekV5TVM1amNtd3cKZ2dFTkJnb3JCZ0VFQWRaNUFnUUNCSUgrQklIN0FQa0FkZ0FXZ3kycjhLa2xEdy93T3FWRi84aS95Q1BRaDB2MgpCQ2tuK09jZk14UDErZ0FBQVp0Vmt2M3NBQUFFQXdCSE1FVUNJRHcrTmZta25rNXoralhGdzFuVWptSEFFcEhGCjlJblFyM0Zad0Y5TG9MeW5BaUVBcHVBMHVWbW0zenZSNHJkeXk5bUxNYkwvVUJnalRsRnRaNzBNUE42Wit0Y0EKZndDbHlYaVNYVmRHRjRLSERkaUpaZ3RjVldTTGZRQkE4dXdIYUZIUmlHa1o5d0FBQVp0Vmt3QVdBQWdBQUFVQQpMTVkzeGdRREFFZ3dSZ0loQVBqNTVpZHdSWDhHODI4Z2JoNlplREVLU0l5RFFnMm54TnNJVUVzSkM2VllBaUVBCnZvbUowb2hLRVhGYzVMams2M3o4dFlIU3Z5M01yNnh6L3ZLekFIZzVzdDR3RFFZSktvWklodmNOQVFFTEJRQUQKZ2dFQkFIT0xLb1d4YTZtR3VJaGNNZDdnNzZGeUVyTi9iRERoZG5sajRubGhMc2kxZmtkbEN0ZDI1emdmVjlWNwpJTVJYVVpnZzVVR1FTeXFhc3VXNHZXNUNmV0lqU3dlcERjU0Q3eldEUUR5WW1NTVZGNUlLK0pzVU8ybHRUa1AvCmJ1b3FaWTdMUmVmdkdCc0gveVhRWFJqMno2dzQ4WU1SSU93djhNbXBMbHNBQnFvR3N3UWdhdytNK2c5Q01BNmQKS1lVcFRGc254R21qTXJKMmNwSExiMmJnMmUxMWxCK1BReDMwdWlZaEFYTlJkbVI2bFlYZ3pOamNLUmVsaHk3UgoxSE50Ky9ZNFYxcUJRVWZUZjdWbWY0SHRyVDd1ZDBNUExFVmx3ODJMM3JJaFJicHIvSERmMDd0RzBpR0tFeUdkCnhiS3VGT3ZDektPN0w2T1drMGVMWkZFeWduVT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQotLS0tLUJFR0lOIENFUlRJRklDQVRFLS0tLS0KTUlJRkJUQ0NBdTJnQXdJQkFnSVFXZ0R5RXRqVXRJRHpra0ZYNmltREJUQU5CZ2txaGtpRzl3MEJBUXNGQURCUApNUXN3Q1FZRFZRUUdFd0pWVXpFcE1DY0dBMVVFQ2hNZ1NXNTBaWEp1WlhRZ1UyVmpkWEpwZEhrZ1VtVnpaV0Z5ClkyZ2dSM0p2ZFhBeEZUQVRCZ05WQkFNVERFbFRVa2NnVW05dmRDQllNVEFlRncweU5EQXpNVE13TURBd01EQmEKRncweU56QXpNVEl5TXpVNU5UbGFNRE14Q3pBSkJnTlZCQVlUQWxWVE1SWXdGQVlEVlFRS0V3MU1aWFFuY3lCRgpibU55ZVhCME1Rd3dDZ1lEVlFRREV3TlNNVE13Z2dFaU1BMEdDU3FHU0liM0RRRUJBUVVBQTRJQkR3QXdnZ0VLCkFvSUJBUUNsWjNDTjBGYUJaQlVYWWMyNUJ0U3RHWkNNSmxBM21CWmprbFRiMmN5RUJaUHMwK3dJRzZCZ1VVTkkKZlN2SFNKYWV0QzNhbmNnbk8xZWhuNnZ3MWc3VURqREtiNXV4MGRha25USStXRTQxYjBWWWFIRVgvRDdZWFlLZwpMN0pSYkxBYVhiaFp6alZseUl1aHJ4QTMvK09jWGNKSkZ6VC9qQ3VMamZDOGNTeVREQjBGeExySHphckpYbnpSCnlRSDNuQVAyL0FwZDlOcDc1dHQyUW5EcjlFMGkyZ0IzYjliSlh4ZjkyblV1cFZjTTl1cGN0dUJ6cFdqUG9YVGkKZFlKK0VKL0I5YUxyQWVrNHNRcEV6TlBDaWZWSk5ZSUtOTE1jNllqQ1IwNkNEZ28yOEVkUGl2RXBCSFhhemVHYQpYUDllblppVnVwcEQwRXFpRndVQkJERFRNck9QQWdNQkFBR2pnZmd3Z2ZVd0RnWURWUjBQQVFIL0JBUURBZ0dHCk1CMEdBMVVkSlFRV01CUUdDQ3NHQVFVRkJ3TUNCZ2dyQmdFRkJRY0RBVEFTQmdOVkhSTUJBZjhFQ0RBR0FRSC8KQWdFQU1CMEdBMVVkRGdRV0JCVG5xNThQTERPZ1U5TmVUM2pJc29RT085YVNNekFmQmdOVkhTTUVHREFXZ0JSNQp0Rm5tZTdibDVBRnpnQWlJeUJwWTl1bWJiakF5QmdnckJnRUZCUWNCQVFRbU1DUXdJZ1lJS3dZQkJRVUhNQUtHCkZtaDBkSEE2THk5NE1TNXBMbXhsYm1OeUxtOXlaeTh3RXdZRFZSMGdCQXd3Q2pBSUJnWm5nUXdCQWdFd0p3WUQKVlIwZkJDQXdIakFjb0JxZ0dJWVdhSFIwY0RvdkwzZ3hMbU11YkdWdVkzSXViM0puTHpBTkJna3Foa2lHOXcwQgpBUXNGQUFPQ0FnRUFVVGRZVXFFaW16VzdUYnJPeXBMcUNmTDdWT3dZZi9RNzlPSDVjSExDWmVnZ2ZRaERjb25sCms3S2doOGIwdmkrL1h1V3U3Q044bi9VUGVnMXZvM0crdGFYaXJyeXR0aFFpbkFIR3djL1VkYk95Z0phOXp1QmMKVnlxb0gzQ1hUWERJblQrOGErYzNhRVZNSjJTdCtwU240ZWQrV2tEcDhpanNpanZFeUZ3RTQ3aHVsVzBMdHpqZwo5Zk9WNVBtcmcvenhXYlJ1TCtrMERCREhFSmVubkNzQWVuN2MzNVBteDdqcG1KL0h0Z1JoY256MHlqU0J2eUl3CjZMMVFJdXBrQ3YyU0JPRFQveEREM2dmUVF5S3Y2cm9WNEcyRWhmRXlBc1dwbW9qeGpDVUNHaXlnOTdGdkR0bS8KTksyTFNjOWx5Ykt4QjczSTIrUDJHM0NhV3B2dnBBaUhDVnUzMGpXOEdDeEtkZmhzWHRuSXkyaW1za1FxVloybQowUG14b2JiMjhUdWNyN3hCSzdDdHd2UHJiNzlvczd1MlhQM081ZjliL0g2NkdOeVJyZ2xSWGxyWWpJMW9HWUwvCmY0STFuL1NndXNkYTZXdkE2QzE5MGt4alUxNVkxMm1IVTQrQnh5UjljeDJoaEdTOWZBak1aS0pzczI4cXh2ejYKQXh1NENhRG1STlpwSy9wUXJYRjE3eVhDWGttRVdndlNPRVp5Nlo5cGNiTElWRUdja1YvaVZlcTBBT28ycGtnOQpwNFFSSXkwdEsyZGlSRU5MU0YyS3lzRndiWTZCMjZCRmVGczN2MXNZVlJoRlc5bkxrT3JRVnBvckNTMEt5Wm1mCndWRDg5cVNUbG5jdExjWm5JYXZqS3NLVXUxbkExaVUweVlNZFllcEtSN2xXYm53aGR4M2V3b2s9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+    finalizeURL: https://acme-v02.api.letsencrypt.org/acme/finalize/2906392776/462561708886
+    state: valid
+    url: https://acme-v02.api.letsencrypt.org/acme/order/2906392776/462561708886
+kind: List
+metadata:
+  resourceVersion: ""

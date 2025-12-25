@@ -1,0 +1,360 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app":"openkpi-minio"},"name":"openkpi-minio","namespace":"open-kpi"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"openkpi-minio"}},"serviceName":"openkpi-minio","template":{"metadata":{"labels":{"app":"openkpi-minio"}},"spec":{"containers":[{"args":["server","/data","--console-address",":9001"],"env":[{"name":"MINIO_BROWSER_REDIRECT_URL","value":""}],"envFrom":[{"secretRef":{"name":"openkpi-minio-secret"}}],"image":"minio/minio:RELEASE.2025-07-23T15-54-02Z","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":6,"httpGet":{"path":"/minio/health/live","port":9000},"initialDelaySeconds":25,"periodSeconds":10,"timeoutSeconds":5},"name":"minio","ports":[{"containerPort":9000,"name":"s3"},{"containerPort":9001,"name":"console"}],"readinessProbe":{"failureThreshold":12,"httpGet":{"path":"/minio/health/ready","port":9000},"initialDelaySeconds":10,"periodSeconds":5,"timeoutSeconds":3},"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":false,"runAsGroup":1000,"runAsNonRoot":true,"runAsUser":1000},"volumeMounts":[{"mountPath":"/data","name":"miniostorage"}]}],"securityContext":{"fsGroup":1000}}},"volumeClaimTemplates":[{"metadata":{"labels":{"app":"openkpi-minio"},"name":"miniostorage"},"spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"50Gi"}},"storageClassName":"local-path"}}]}}
+    creationTimestamp: "2025-12-24T20:24:31Z"
+    generation: 1
+    labels:
+      app: openkpi-minio
+    name: openkpi-minio
+    namespace: open-kpi
+    resourceVersion: "1353"
+    uid: 7ab3b594-9c2e-42b1-a6c8-b52d40b4defc
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: openkpi-minio
+    serviceName: openkpi-minio
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: openkpi-minio
+      spec:
+        containers:
+        - args:
+          - server
+          - /data
+          - --console-address
+          - :9001
+          env:
+          - name: MINIO_BROWSER_REDIRECT_URL
+          envFrom:
+          - secretRef:
+              name: openkpi-minio-secret
+          image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+              scheme: HTTP
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: minio
+          ports:
+          - containerPort: 9000
+            name: s3
+            protocol: TCP
+          - containerPort: 9001
+            name: console
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 12
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /data
+            name: miniostorage
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        terminationGracePeriodSeconds: 30
+    updateStrategy:
+      rollingUpdate:
+        partition: 0
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: openkpi-minio
+        name: miniostorage
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+        storageClassName: local-path
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: openkpi-minio-5dcb7d7946
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: openkpi-minio-5dcb7d7946
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"StatefulSet","metadata":{"annotations":{},"labels":{"app":"openkpi-postgres"},"name":"openkpi-postgres","namespace":"open-kpi"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"openkpi-postgres"}},"serviceName":"openkpi-postgres","template":{"metadata":{"labels":{"app":"openkpi-postgres"}},"spec":{"containers":[{"env":[{"name":"PGDATA","value":"/var/lib/postgresql/data/pgdata"}],"envFrom":[{"secretRef":{"name":"openkpi-postgres-secret"}}],"image":"postgres:16","imagePullPolicy":"IfNotPresent","livenessProbe":{"exec":{"command":["/bin/sh","-c","pg_isready -U \"${POSTGRES_USER}\" -d \"${POSTGRES_DB}\" -h 127.0.0.1 -p 5432"]},"failureThreshold":6,"initialDelaySeconds":25,"periodSeconds":10,"timeoutSeconds":5},"name":"postgres","ports":[{"containerPort":5432,"name":"postgres"}],"readinessProbe":{"exec":{"command":["/bin/sh","-c","pg_isready -U \"${POSTGRES_USER}\" -d \"${POSTGRES_DB}\" -h 127.0.0.1 -p 5432"]},"failureThreshold":12,"initialDelaySeconds":10,"periodSeconds":5,"timeoutSeconds":3},"securityContext":{"allowPrivilegeEscalation":false,"readOnlyRootFilesystem":false,"runAsGroup":999,"runAsNonRoot":true,"runAsUser":999},"volumeMounts":[{"mountPath":"/var/lib/postgresql/data","name":"pgdata"}]}],"initContainers":[{"command":["/bin/sh","-c","set -e\nmkdir -p /var/lib/postgresql/data\nchown -R 999:999 /var/lib/postgresql/data\nchmod 700 /var/lib/postgresql/data\n"],"image":"postgres:16","imagePullPolicy":"IfNotPresent","name":"init-permissions","securityContext":{"allowPrivilegeEscalation":false,"runAsGroup":0,"runAsUser":0},"volumeMounts":[{"mountPath":"/var/lib/postgresql/data","name":"pgdata"}]}],"securityContext":{}}},"volumeClaimTemplates":[{"metadata":{"labels":{"app":"openkpi-postgres"},"name":"pgdata"},"spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"20Gi"}},"storageClassName":"local-path"}}]}}
+    creationTimestamp: "2025-12-24T20:24:31Z"
+    generation: 1
+    labels:
+      app: openkpi-postgres
+    name: openkpi-postgres
+    namespace: open-kpi
+    resourceVersion: "1358"
+    uid: 13d3964b-01fe-4046-961c-d03b9b236b60
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: openkpi-postgres
+    serviceName: openkpi-postgres
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: openkpi-postgres
+      spec:
+        containers:
+        - env:
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
+          envFrom:
+          - secretRef:
+              name: openkpi-postgres-secret
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -h 127.0.0.1
+                -p 5432
+            failureThreshold: 6
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: postgres
+          ports:
+          - containerPort: 5432
+            name: postgres
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -h 127.0.0.1
+                -p 5432
+            failureThreshold: 12
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsGroup: 999
+            runAsNonRoot: true
+            runAsUser: 999
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/lib/postgresql/data
+            name: pgdata
+        dnsPolicy: ClusterFirst
+        initContainers:
+        - command:
+          - /bin/sh
+          - -c
+          - |
+            set -e
+            mkdir -p /var/lib/postgresql/data
+            chown -R 999:999 /var/lib/postgresql/data
+            chmod 700 /var/lib/postgresql/data
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          name: init-permissions
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsGroup: 0
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/lib/postgresql/data
+            name: pgdata
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+    updateStrategy:
+      rollingUpdate:
+        partition: 0
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: openkpi-postgres
+        name: pgdata
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+        storageClassName: local-path
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: openkpi-postgres-859b4d8c6d
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: openkpi-postgres-859b4d8c6d
+    updatedReplicas: 1
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"openkpi-minio"},"name":"openkpi-minio","namespace":"open-kpi"},"spec":{"ports":[{"name":"s3","port":9000,"targetPort":9000},{"name":"console","port":9001,"targetPort":9001}],"selector":{"app":"openkpi-minio"},"type":"ClusterIP"}}
+    creationTimestamp: "2025-12-24T20:24:31Z"
+    labels:
+      app: openkpi-minio
+    name: openkpi-minio
+    namespace: open-kpi
+    resourceVersion: "1268"
+    uid: ab5a6304-b1a6-463c-953c-f2fe5e7e6533
+  spec:
+    clusterIP: 10.43.38.217
+    clusterIPs:
+    - 10.43.38.217
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: s3
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+    - name: console
+      port: 9001
+      protocol: TCP
+      targetPort: 9001
+    selector:
+      app: openkpi-minio
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"labels":{"app":"openkpi-postgres"},"name":"openkpi-postgres","namespace":"open-kpi"},"spec":{"ports":[{"name":"postgres","port":5432,"targetPort":5432}],"selector":{"app":"openkpi-postgres"},"type":"ClusterIP"}}
+    creationTimestamp: "2025-12-24T20:24:31Z"
+    labels:
+      app: openkpi-postgres
+    name: openkpi-postgres
+    namespace: open-kpi
+    resourceVersion: "1246"
+    uid: 56767c87-64b1-445e-a536-78794ac81b58
+  spec:
+    clusterIP: 10.43.82.134
+    clusterIPs:
+    - 10.43.82.134
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: postgres
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+    selector:
+      app: openkpi-postgres
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+      dmVyLWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAATnFiU7bBSGw1xnMhMzKu8k+B3pMR+L92SW7nRee1ix
+      lnGEK8372uuBcF8zzrJGnyyma4jMlNPjE6wgZuPi6xMlo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK0kEelYwOY3kgq3QQ8bP
+      NVTy4HEwCgYIKoZIzj0EAwIDSQAwRgIhAMGD2PiWLWEmqssuAOFSqbIZ5w1mpVav
+      Dg26sRLLcrgqAiEAuToBfY7Yafg5C018WzHmZhts9/07vJegDAfzl0AXUgA=
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2025-12-24T20:19:25Z"
+    name: kube-root-ca.crt
+    namespace: open-kpi
+    resourceVersion: "452"
+    uid: c2420b77-1e4d-4f5d-87fc-53f1ad09242d
+kind: List
+metadata:
+  resourceVersion: ""

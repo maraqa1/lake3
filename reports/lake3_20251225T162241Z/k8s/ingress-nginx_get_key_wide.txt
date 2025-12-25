@@ -1,0 +1,33 @@
+NAME                                         TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE   SELECTOR
+service/ingress-nginx-controller             LoadBalancer   10.43.7.48      37.27.4.125   80:30249/TCP,443:32246/TCP   20h   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+service/ingress-nginx-controller-admission   ClusterIP      10.43.121.187   <none>        443/TCP                      20h   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+
+NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                                                                                     SELECTOR
+deployment.apps/ingress-nginx-controller   1/1     1            1           20h   controller   registry.k8s.io/ingress-nginx/controller:v1.14.1@sha256:f95a79b85fb93ac3de752c71a5c27d5ceae10a18b61904dec224c1c6a4581e47   app.kubernetes.io/component=controller,app.kubernetes.io/instance=ingress-nginx,app.kubernetes.io/name=ingress-nginx
+
+NAME                                 DATA   AGE
+configmap/ingress-nginx-controller   0      20h
+configmap/kube-root-ca.crt           1      20h
+
+NAME                                          TYPE                 DATA   AGE
+secret/ingress-nginx-admission                Opaque               3      20h
+secret/sh.helm.release.v1.ingress-nginx.v10   helm.sh/release.v1   1      4h53m
+secret/sh.helm.release.v1.ingress-nginx.v11   helm.sh/release.v1   1      59m
+secret/sh.helm.release.v1.ingress-nginx.v2    helm.sh/release.v1   1      19h
+secret/sh.helm.release.v1.ingress-nginx.v3    helm.sh/release.v1   1      19h
+secret/sh.helm.release.v1.ingress-nginx.v4    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.ingress-nginx.v5    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.ingress-nginx.v6    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.ingress-nginx.v7    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.ingress-nginx.v8    helm.sh/release.v1   1      17h
+secret/sh.helm.release.v1.ingress-nginx.v9    helm.sh/release.v1   1      17h
+
+NAME                           SECRETS   AGE
+serviceaccount/default         0         20h
+serviceaccount/ingress-nginx   0         20h
+
+NAME                                           CREATED AT
+role.rbac.authorization.k8s.io/ingress-nginx   2025-12-24T20:19:33Z
+
+NAME                                                  ROLE                 AGE   USERS   GROUPS   SERVICEACCOUNTS
+rolebinding.rbac.authorization.k8s.io/ingress-nginx   Role/ingress-nginx   20h                    ingress-nginx/ingress-nginx

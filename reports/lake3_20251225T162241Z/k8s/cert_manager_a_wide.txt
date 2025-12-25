@@ -1,0 +1,7 @@
+NAMESPACE   NAME                                     READY   SECRET       ISSUER               STATUS                                          AGE
+n8n         certificate.cert-manager.io/n8n-tls      True    n8n-tls      letsencrypt-http01   Certificate is up to date and has not expired   4h51m
+platform    certificate.cert-manager.io/portal-tls   True    portal-tls   letsencrypt-http01   Certificate is up to date and has not expired   3h28m
+
+NAMESPACE   NAME                                                 STATE   ISSUER               REASON   AGE
+n8n         order.acme.cert-manager.io/n8n-tls-1-163260902       valid   letsencrypt-http01            4h51m
+platform    order.acme.cert-manager.io/portal-tls-1-3053714584   valid   letsencrypt-http01            3h28m

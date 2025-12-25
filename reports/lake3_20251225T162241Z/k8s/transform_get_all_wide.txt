@@ -1,0 +1,2 @@
+NAME                        SCHEDULE    TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE   CONTAINERS   IMAGES                                SELECTOR
+cronjob.batch/dbt-nightly   0 2 * * *   <none>     False     0        <none>          8h    dbt          ghcr.io/dbt-labs/dbt-postgres:1.8.0   <none>

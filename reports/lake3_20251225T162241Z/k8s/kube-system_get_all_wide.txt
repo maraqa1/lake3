@@ -1,0 +1,22 @@
+NAME                                                READY   STATUS    RESTARTS   AGE     IP            NODE            NOMINATED NODE   READINESS GATES
+pod/coredns-6d668d687-pz5fd                         1/1     Running   0          20h     10.42.0.7     datalake-srv3   <none>           <none>
+pod/local-path-provisioner-869c44bfbd-94rg5         1/1     Running   0          20h     10.42.0.6     datalake-srv3   <none>           <none>
+pod/metrics-server-7bfffcd44-5gqmb                  1/1     Running   0          20h     10.42.0.5     datalake-srv3   <none>           <none>
+pod/svclb-ingress-nginx-controller-c87d805d-ljctr   2/2     Running   0          4h53m   10.42.0.169   datalake-srv3   <none>           <none>
+
+NAME                     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                  AGE   SELECTOR
+service/kube-dns         ClusterIP   10.43.0.10     <none>        53/UDP,53/TCP,9153/TCP   20h   k8s-app=kube-dns
+service/metrics-server   ClusterIP   10.43.33.117   <none>        443/TCP                  20h   k8s-app=metrics-server
+
+NAME                                                     DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE     CONTAINERS             IMAGES                                                  SELECTOR
+daemonset.apps/svclb-ingress-nginx-controller-c87d805d   1         1         1       1            1           <none>          4h53m   lb-tcp-80,lb-tcp-443   rancher/klipper-lb:v0.4.13,rancher/klipper-lb:v0.4.13   app=svclb-ingress-nginx-controller-c87d805d
+
+NAME                                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS               IMAGES                                    SELECTOR
+deployment.apps/coredns                  1/1     1            1           20h   coredns                  rancher/mirrored-coredns-coredns:1.13.1   k8s-app=kube-dns
+deployment.apps/local-path-provisioner   1/1     1            1           20h   local-path-provisioner   rancher/local-path-provisioner:v0.0.32    app=local-path-provisioner
+deployment.apps/metrics-server           1/1     1            1           20h   metrics-server           rancher/mirrored-metrics-server:v0.8.0    k8s-app=metrics-server
+
+NAME                                                DESIRED   CURRENT   READY   AGE   CONTAINERS               IMAGES                                    SELECTOR
+replicaset.apps/coredns-6d668d687                   1         1         1       20h   coredns                  rancher/mirrored-coredns-coredns:1.13.1   k8s-app=kube-dns,pod-template-hash=6d668d687
+replicaset.apps/local-path-provisioner-869c44bfbd   1         1         1       20h   local-path-provisioner   rancher/local-path-provisioner:v0.0.32    app=local-path-provisioner,pod-template-hash=869c44bfbd
+replicaset.apps/metrics-server-7bfffcd44            1         1         1       20h   metrics-server           rancher/mirrored-metrics-server:v0.8.0    k8s-app=metrics-server,pod-template-hash=7bfffcd44

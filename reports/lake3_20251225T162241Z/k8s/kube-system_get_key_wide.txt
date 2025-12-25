@@ -1,0 +1,82 @@
+NAME                     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                  AGE   SELECTOR
+service/kube-dns         ClusterIP   10.43.0.10     <none>        53/UDP,53/TCP,9153/TCP   20h   k8s-app=kube-dns
+service/metrics-server   ClusterIP   10.43.33.117   <none>        443/TCP                  20h   k8s-app=metrics-server
+
+NAME                                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS               IMAGES                                    SELECTOR
+deployment.apps/coredns                  1/1     1            1           20h   coredns                  rancher/mirrored-coredns-coredns:1.13.1   k8s-app=kube-dns
+deployment.apps/local-path-provisioner   1/1     1            1           20h   local-path-provisioner   rancher/local-path-provisioner:v0.0.32    app=local-path-provisioner
+deployment.apps/metrics-server           1/1     1            1           20h   metrics-server           rancher/mirrored-metrics-server:v0.8.0    k8s-app=metrics-server
+
+NAME                                                             DATA   AGE
+configmap/cluster-dns                                            2      20h
+configmap/coredns                                                2      20h
+configmap/extension-apiserver-authentication                     6      20h
+configmap/kube-apiserver-legacy-service-account-token-tracking   1      20h
+configmap/kube-root-ca.crt                                       1      20h
+configmap/local-path-config                                      4      20h
+
+NAME                                     TYPE                          DATA   AGE
+secret/datalake-srv3.node-password.k3s   k3s.cattle.io/node-password   1      20h
+secret/k3s-serving                       kubernetes.io/tls             2      20h
+
+NAME                                                         SECRETS   AGE
+serviceaccount/attachdetach-controller                       0         20h
+serviceaccount/certificate-controller                        0         20h
+serviceaccount/clusterrole-aggregation-controller            0         20h
+serviceaccount/coredns                                       0         20h
+serviceaccount/cronjob-controller                            0         20h
+serviceaccount/daemon-set-controller                         0         20h
+serviceaccount/default                                       0         20h
+serviceaccount/deployment-controller                         0         20h
+serviceaccount/disruption-controller                         0         20h
+serviceaccount/endpoint-controller                           0         20h
+serviceaccount/endpointslice-controller                      0         20h
+serviceaccount/endpointslicemirroring-controller             0         20h
+serviceaccount/ephemeral-volume-controller                   0         20h
+serviceaccount/expand-controller                             0         20h
+serviceaccount/generic-garbage-collector                     0         20h
+serviceaccount/horizontal-pod-autoscaler                     0         20h
+serviceaccount/job-controller                                0         20h
+serviceaccount/legacy-service-account-token-cleaner          0         20h
+serviceaccount/local-path-provisioner-service-account        0         20h
+serviceaccount/metrics-server                                0         20h
+serviceaccount/namespace-controller                          0         20h
+serviceaccount/node-controller                               0         20h
+serviceaccount/persistent-volume-binder                      0         20h
+serviceaccount/pod-garbage-collector                         0         20h
+serviceaccount/pv-protection-controller                      0         20h
+serviceaccount/pvc-protection-controller                     0         20h
+serviceaccount/replicaset-controller                         0         20h
+serviceaccount/replication-controller                        0         20h
+serviceaccount/resourcequota-controller                      0         20h
+serviceaccount/root-ca-cert-publisher                        0         20h
+serviceaccount/service-account-controller                    0         20h
+serviceaccount/service-cidrs-controller                      0         20h
+serviceaccount/statefulset-controller                        0         20h
+serviceaccount/svclb                                         0         20h
+serviceaccount/token-cleaner                                 0         20h
+serviceaccount/ttl-after-finished-controller                 0         20h
+serviceaccount/ttl-controller                                0         20h
+serviceaccount/validatingadmissionpolicy-status-controller   0         20h
+
+NAME                                                                            CREATED AT
+role.rbac.authorization.k8s.io/cert-manager-cainjector:leaderelection           2025-12-24T20:19:56Z
+role.rbac.authorization.k8s.io/cert-manager:leaderelection                      2025-12-24T20:19:56Z
+role.rbac.authorization.k8s.io/extension-apiserver-authentication-reader        2025-12-24T20:19:18Z
+role.rbac.authorization.k8s.io/system::leader-locking-kube-controller-manager   2025-12-24T20:19:19Z
+role.rbac.authorization.k8s.io/system::leader-locking-kube-scheduler            2025-12-24T20:19:19Z
+role.rbac.authorization.k8s.io/system:controller:bootstrap-signer               2025-12-24T20:19:19Z
+role.rbac.authorization.k8s.io/system:controller:cloud-provider                 2025-12-24T20:19:19Z
+role.rbac.authorization.k8s.io/system:controller:token-cleaner                  2025-12-24T20:19:19Z
+
+NAME                                                                                       ROLE                                                  AGE   USERS                                                   GROUPS   SERVICEACCOUNTS
+rolebinding.rbac.authorization.k8s.io/cert-manager-cainjector:leaderelection               Role/cert-manager-cainjector:leaderelection           20h                                                                    cert-manager/cert-manager-cainjector
+rolebinding.rbac.authorization.k8s.io/cert-manager:leaderelection                          Role/cert-manager:leaderelection                      20h                                                                    cert-manager/cert-manager
+rolebinding.rbac.authorization.k8s.io/k3s-cloud-controller-manager-authentication-reader   Role/extension-apiserver-authentication-reader        20h   k3s-cloud-controller-manager                                     
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader                           Role/extension-apiserver-authentication-reader        20h                                                                    kube-system/metrics-server
+rolebinding.rbac.authorization.k8s.io/system::extension-apiserver-authentication-reader    Role/extension-apiserver-authentication-reader        20h   system:kube-controller-manager, system:kube-scheduler            
+rolebinding.rbac.authorization.k8s.io/system::leader-locking-kube-controller-manager       Role/system::leader-locking-kube-controller-manager   20h   system:kube-controller-manager                                   kube-system/kube-controller-manager, kube-system/leader-election-controller
+rolebinding.rbac.authorization.k8s.io/system::leader-locking-kube-scheduler                Role/system::leader-locking-kube-scheduler            20h   system:kube-scheduler                                            kube-system/kube-scheduler
+rolebinding.rbac.authorization.k8s.io/system:controller:bootstrap-signer                   Role/system:controller:bootstrap-signer               20h                                                                    kube-system/bootstrap-signer
+rolebinding.rbac.authorization.k8s.io/system:controller:cloud-provider                     Role/system:controller:cloud-provider                 20h                                                                    kube-system/cloud-provider
+rolebinding.rbac.authorization.k8s.io/system:controller:token-cleaner                      Role/system:controller:token-cleaner                  20h                                                                    kube-system/token-cleaner

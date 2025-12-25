@@ -1,0 +1,2336 @@
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad
+    namespace: tickets
+    resourceVersion: "39218"
+    uid: 87715b2e-10a9-46e1-bbce-b335c803a497
+  spec:
+    ingressClassName: nginx
+    rules:
+    - host: chart-example.local
+      http:
+        paths:
+        - backend:
+            service:
+              name: zammad-nginx
+              port:
+                number: 8080
+          path: /
+          pathType: ImplementationSpecific
+    tls:
+    - hosts:
+      - zammad.lake3.opendatalake.com
+      secretName: zammad-tls
+  status:
+    loadBalancer:
+      ingress:
+      - ip: 37.27.4.125
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: memcached
+      app.kubernetes.io/version: 1.6.38
+      helm.sh/chart: memcached-7.9.3
+    name: zammad-memcached
+    namespace: tickets
+    resourceVersion: "28801"
+    uid: 43a58ce7-2073-4099-8d1b-be4f31e51ddd
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: memcached
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: memcached
+          app.kubernetes.io/version: 1.6.38
+          helm.sh/chart: memcached-7.9.3
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: zammad
+                    app.kubernetes.io/name: memcached
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        automountServiceAccountToken: false
+        containers:
+        - env:
+          - name: BITNAMI_DEBUG
+            value: "false"
+          - name: MEMCACHED_PORT_NUMBER
+            value: "11211"
+          image: docker.io/bitnamilegacy/memcached:1.6.38-debian-12-r8
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - pgrep
+              - memcached
+            failureThreshold: 6
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: memcached
+          ports:
+          - containerPort: 11211
+            name: memcache
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 6
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            tcpSocket:
+              port: memcache
+            timeoutSeconds: 3
+          resources:
+            limits:
+              cpu: 150m
+              ephemeral-storage: 2Gi
+              memory: 192Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 50Mi
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /opt/bitnami/memcached/conf
+            name: empty-dir
+            subPath: app-conf-dir
+          - mountPath: /tmp
+            name: empty-dir
+            subPath: tmp-dir
+        dnsPolicy: ClusterFirst
+        enableServiceLinks: true
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: Always
+        serviceAccount: zammad-memcached
+        serviceAccountName: zammad-memcached
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir: {}
+          name: empty-dir
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T07:11:46Z"
+      lastUpdateTime: "2025-12-25T07:11:46Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T07:11:35Z"
+      lastUpdateTime: "2025-12-25T07:11:46Z"
+      message: ReplicaSet "zammad-memcached-644697cbc" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: zammad-nginx
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-nginx
+    namespace: tickets
+    resourceVersion: "29061"
+    uid: 6c106e74-0637-4ae3-b950-853bb4a1ddc8
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: zammad-nginx
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: zammad
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          checksum/config: 3747244ed4a16de900f1ab0472b3da6a1fbd9a55aef85a10c4458a33997a2be4
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: zammad-nginx
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: zammad
+          app.kubernetes.io/version: 6.5.2-46
+          helm.sh/chart: zammad-15.6.0
+      spec:
+        containers:
+        - command:
+          - /usr/sbin/nginx
+          - -g
+          - daemon off;
+          env:
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: redis-password
+                name: zammad-redis-pass
+          - name: MEMCACHE_SERVERS
+            value: zammad-memcached:11211
+          - name: RAILS_TRUSTED_PROXIES
+            value: '[''127.0.0.1'', ''::1'']'
+          - name: REDIS_URL
+            value: redis://:$(REDIS_PASSWORD)@zammad-redis-master:6379
+          - name: POSTGRESQL_PASS
+            valueFrom:
+              secretKeyRef:
+                key: postgresql-pass
+                name: zammad-postgresql-pass
+          - name: DATABASE_URL
+            value: postgres://zammad:$(POSTGRESQL_PASS)@zammad-postgresql:5432/zammad_production?pool=50
+          - name: TMP
+            value: /opt/zammad/tmp
+          - name: RAILS_CHECK_PENDING_MIGRATIONS
+            value: "true"
+          image: ghcr.io/zammad/zammad:6.5.2-46
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 5
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 8080
+            timeoutSeconds: 5
+          name: zammad-nginx
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          startupProbe:
+            failureThreshold: 20
+            periodSeconds: 4
+            successThreshold: 1
+            tcpSocket:
+              port: 8080
+            timeoutSeconds: 1
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+          - mountPath: /etc/nginx/nginx.conf
+            name: zammad-nginx
+            readOnly: true
+            subPath: nginx.conf
+          - mountPath: /etc/nginx/sites-enabled/default
+            name: zammad-nginx
+            readOnly: true
+            subPath: default
+          - mountPath: /var/log/nginx
+            name: zammad-tmp
+        dnsPolicy: ClusterFirst
+        initContainers:
+        - command:
+          - /bin/sh
+          - -cx
+          - |
+            chmod 770 /opt/zammad/tmp
+          image: alpine:3.22.2
+          imagePullPolicy: IfNotPresent
+          name: zammad-volume-permissions
+          resources: {}
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: Always
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir:
+            sizeLimit: 100Mi
+          name: zammad-tmp
+        - configMap:
+            defaultMode: 493
+            name: zammad-init
+          name: zammad-init
+        - configMap:
+            defaultMode: 420
+            name: zammad-nginx
+          name: zammad-nginx
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T07:13:21Z"
+      lastUpdateTime: "2025-12-25T07:13:21Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T07:11:35Z"
+      lastUpdateTime: "2025-12-25T07:13:21Z"
+      message: ReplicaSet "zammad-nginx-796b9b8bbf" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: zammad-railsserver
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-railsserver
+    namespace: tickets
+    resourceVersion: "29052"
+    uid: a54cfcca-1329-47b9-8082-b23cd3432197
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: zammad-railsserver
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: zammad
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: zammad-railsserver
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: zammad
+          app.kubernetes.io/version: 6.5.2-46
+          helm.sh/chart: zammad-15.6.0
+      spec:
+        containers:
+        - command:
+          - bundle
+          - exec
+          - puma
+          - -b
+          - tcp://[::]:3000
+          - -w
+          - "0"
+          - -e
+          - production
+          env:
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: redis-password
+                name: zammad-redis-pass
+          - name: MEMCACHE_SERVERS
+            value: zammad-memcached:11211
+          - name: RAILS_TRUSTED_PROXIES
+            value: '[''127.0.0.1'', ''::1'']'
+          - name: REDIS_URL
+            value: redis://:$(REDIS_PASSWORD)@zammad-redis-master:6379
+          - name: POSTGRESQL_PASS
+            valueFrom:
+              secretKeyRef:
+                key: postgresql-pass
+                name: zammad-postgresql-pass
+          - name: DATABASE_URL
+            value: postgres://zammad:$(POSTGRESQL_PASS)@zammad-postgresql:5432/zammad_production?pool=50
+          - name: TMP
+            value: /opt/zammad/tmp
+          - name: RAILS_CHECK_PENDING_MIGRATIONS
+            value: "true"
+          image: ghcr.io/zammad/zammad:6.5.2-46
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 5
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 3000
+            timeoutSeconds: 5
+          name: zammad-railsserver
+          ports:
+          - containerPort: 3000
+            name: railsserver
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /
+              port: 3000
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          startupProbe:
+            failureThreshold: 20
+            periodSeconds: 4
+            successThreshold: 1
+            tcpSocket:
+              port: 3000
+            timeoutSeconds: 1
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        dnsPolicy: ClusterFirst
+        initContainers:
+        - command:
+          - /bin/sh
+          - -cx
+          - |
+            chmod 770 /opt/zammad/tmp
+          image: alpine:3.22.2
+          imagePullPolicy: IfNotPresent
+          name: zammad-volume-permissions
+          resources: {}
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: Always
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir:
+            sizeLimit: 100Mi
+          name: zammad-tmp
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T07:13:16Z"
+      lastUpdateTime: "2025-12-25T07:13:16Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T07:11:35Z"
+      lastUpdateTime: "2025-12-25T07:13:16Z"
+      message: ReplicaSet "zammad-railsserver-7bbcdb9544" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      checkov.io/skip1: CKV_K8S_8=Liveness Probe Should be Configured - not possible
+        with scheduler
+      checkov.io/skip2: CKV_K8S_9=Readiness Probe Should be Configured - not possible
+        with scheduler
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: zammad-scheduler
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-scheduler
+    namespace: tickets
+    resourceVersion: "29003"
+    uid: 7269ae1a-07e0-4ce0-9366-870a93ccf17c
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: zammad-scheduler
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: zammad
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: zammad-scheduler
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: zammad
+          app.kubernetes.io/version: 6.5.2-46
+          helm.sh/chart: zammad-15.6.0
+      spec:
+        containers:
+        - command:
+          - bundle
+          - exec
+          - script/background-worker.rb
+          - start
+          env:
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: redis-password
+                name: zammad-redis-pass
+          - name: MEMCACHE_SERVERS
+            value: zammad-memcached:11211
+          - name: RAILS_TRUSTED_PROXIES
+            value: '[''127.0.0.1'', ''::1'']'
+          - name: REDIS_URL
+            value: redis://:$(REDIS_PASSWORD)@zammad-redis-master:6379
+          - name: POSTGRESQL_PASS
+            valueFrom:
+              secretKeyRef:
+                key: postgresql-pass
+                name: zammad-postgresql-pass
+          - name: DATABASE_URL
+            value: postgres://zammad:$(POSTGRESQL_PASS)@zammad-postgresql:5432/zammad_production?pool=50
+          - name: TMP
+            value: /opt/zammad/tmp
+          - name: RAILS_CHECK_PENDING_MIGRATIONS
+            value: "true"
+          image: ghcr.io/zammad/zammad:6.5.2-46
+          imagePullPolicy: IfNotPresent
+          name: zammad-scheduler
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        dnsPolicy: ClusterFirst
+        initContainers:
+        - command:
+          - /bin/sh
+          - -cx
+          - |
+            chmod 770 /opt/zammad/tmp
+          image: alpine:3.22.2
+          imagePullPolicy: IfNotPresent
+          name: zammad-volume-permissions
+          resources: {}
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: Always
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir:
+            sizeLimit: 100Mi
+          name: zammad-tmp
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T07:11:35Z"
+      lastUpdateTime: "2025-12-25T07:11:53Z"
+      message: ReplicaSet "zammad-scheduler-8f6d44bf9" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    - lastTransitionTime: "2025-12-25T07:12:46Z"
+      lastUpdateTime: "2025-12-25T07:12:46Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: zammad-websocket
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-websocket
+    namespace: tickets
+    resourceVersion: "29045"
+    uid: becee561-7c0b-4086-846d-5a6bf4013938
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: zammad-websocket
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: zammad
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: zammad-websocket
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: zammad
+          app.kubernetes.io/version: 6.5.2-46
+          helm.sh/chart: zammad-15.6.0
+      spec:
+        containers:
+        - command:
+          - bundle
+          - exec
+          - script/websocket-server.rb
+          - -b
+          - '::'
+          - -p
+          - "6042"
+          - start
+          env:
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: redis-password
+                name: zammad-redis-pass
+          - name: MEMCACHE_SERVERS
+            value: zammad-memcached:11211
+          - name: RAILS_TRUSTED_PROXIES
+            value: '[''127.0.0.1'', ''::1'']'
+          - name: REDIS_URL
+            value: redis://:$(REDIS_PASSWORD)@zammad-redis-master:6379
+          - name: POSTGRESQL_PASS
+            valueFrom:
+              secretKeyRef:
+                key: postgresql-pass
+                name: zammad-postgresql-pass
+          - name: DATABASE_URL
+            value: postgres://zammad:$(POSTGRESQL_PASS)@zammad-postgresql:5432/zammad_production?pool=50
+          - name: TMP
+            value: /opt/zammad/tmp
+          - name: RAILS_CHECK_PENDING_MIGRATIONS
+            value: "true"
+          image: ghcr.io/zammad/zammad:6.5.2-46
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 10
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 6042
+            timeoutSeconds: 5
+          name: zammad-websocket
+          ports:
+          - containerPort: 6042
+            name: websocket
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 5
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 6042
+            timeoutSeconds: 5
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          startupProbe:
+            failureThreshold: 20
+            periodSeconds: 4
+            successThreshold: 1
+            tcpSocket:
+              port: 6042
+            timeoutSeconds: 1
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        dnsPolicy: ClusterFirst
+        initContainers:
+        - command:
+          - /bin/sh
+          - -cx
+          - |
+            chmod 770 /opt/zammad/tmp
+          image: alpine:3.22.2
+          imagePullPolicy: IfNotPresent
+          name: zammad-volume-permissions
+          resources: {}
+          securityContext:
+            capabilities:
+              drop:
+              - ALL
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsNonRoot: false
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: zammad-tmp
+          - mountPath: /opt/zammad/tmp
+            name: zammad-tmp
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+          fsGroupChangePolicy: Always
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir:
+            sizeLimit: 100Mi
+          name: zammad-tmp
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T07:13:15Z"
+      lastUpdateTime: "2025-12-25T07:13:15Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T07:11:35Z"
+      lastUpdateTime: "2025-12-25T07:13:15Z"
+      message: ReplicaSet "zammad-websocket-699785b84f" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app: master
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: elasticsearch
+      app.kubernetes.io/version: 8.18.0
+      helm.sh/chart: elasticsearch-21.6.3
+    name: zammad-elasticsearch-master
+    namespace: tickets
+    resourceVersion: "29078"
+    uid: 576a0107-43c8-40ed-a24c-c370842f8e9a
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: Parallel
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: master
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: elasticsearch
+    serviceName: zammad-elasticsearch-master-hl
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: master
+          app.kubernetes.io/component: master
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: elasticsearch
+          app.kubernetes.io/version: 8.18.0
+          helm.sh/chart: elasticsearch-21.6.3
+      spec:
+        affinity: {}
+        automountServiceAccountToken: false
+        containers:
+        - env:
+          - name: BITNAMI_DEBUG
+            value: "false"
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: ELASTICSEARCH_IS_DEDICATED_NODE
+            value: "no"
+          - name: ELASTICSEARCH_NODE_ROLES
+            value: master
+          - name: ELASTICSEARCH_TRANSPORT_PORT_NUMBER
+            value: "9300"
+          - name: ELASTICSEARCH_HTTP_PORT_NUMBER
+            value: "9200"
+          - name: ELASTICSEARCH_CLUSTER_NAME
+            value: zammad
+          - name: ELASTICSEARCH_HEAP_SIZE
+            value: 512m
+          image: docker.io/bitnamilegacy/elasticsearch:8.18.0-debian-12-r2
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 5
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: rest-api
+            timeoutSeconds: 5
+          name: elasticsearch
+          ports:
+          - containerPort: 9200
+            name: rest-api
+            protocol: TCP
+          - containerPort: 9300
+            name: transport
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /opt/bitnami/scripts/elasticsearch/healthcheck.sh
+            failureThreshold: 5
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: 750m
+              ephemeral-storage: 2Gi
+              memory: 1536Mi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 50Mi
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: empty-dir
+            subPath: tmp-dir
+          - mountPath: /opt/bitnami/elasticsearch/config
+            name: empty-dir
+            subPath: app-conf-dir
+          - mountPath: /opt/bitnami/elasticsearch/tmp
+            name: empty-dir
+            subPath: app-tmp-dir
+          - mountPath: /opt/bitnami/elasticsearch/logs
+            name: empty-dir
+            subPath: app-logs-dir
+          - mountPath: /opt/bitnami/elasticsearch/plugins
+            name: empty-dir
+            subPath: app-plugins-dir
+          - mountPath: /bitnami/elasticsearch
+            name: empty-dir
+            subPath: app-volume-dir
+          - mountPath: /bitnami/elasticsearch/data
+            name: data
+        dnsPolicy: ClusterFirst
+        initContainers:
+        - command:
+          - /bin/bash
+          - -ec
+          - |
+            CURRENT=`sysctl -n vm.max_map_count`;
+            DESIRED="262144";
+            if [ "$DESIRED" -gt "$CURRENT" ]; then
+                sysctl -w vm.max_map_count=262144;
+            fi;
+            CURRENT=`sysctl -n fs.file-max`;
+            DESIRED="65536";
+            if [ "$DESIRED" -gt "$CURRENT" ]; then
+                sysctl -w fs.file-max=65536;
+            fi;
+          image: docker.io/bitnamilegacy/os-shell:12-debian-12-r43
+          imagePullPolicy: IfNotPresent
+          name: sysctl
+          resources:
+            limits:
+              cpu: 150m
+              ephemeral-storage: 2Gi
+              memory: 192Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 50Mi
+              memory: 128Mi
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        - args:
+          - -ec
+          - |
+            #!/bin/bash
+
+            . /opt/bitnami/scripts/libfs.sh
+            . /opt/bitnami/scripts/elasticsearch-env.sh
+
+            if ! is_dir_empty "$DB_DEFAULT_PLUGINS_DIR"; then
+                cp -nr "$DB_DEFAULT_PLUGINS_DIR"/* /plugins
+            fi
+          command:
+          - /bin/bash
+          image: docker.io/bitnamilegacy/elasticsearch:8.18.0-debian-12-r2
+          imagePullPolicy: IfNotPresent
+          name: copy-default-plugins
+          resources:
+            limits:
+              cpu: 750m
+              ephemeral-storage: 2Gi
+              memory: 1536Mi
+            requests:
+              cpu: 500m
+              ephemeral-storage: 50Mi
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: empty-dir
+            subPath: tmp-dir
+          - mountPath: /plugins
+            name: empty-dir
+            subPath: app-plugins-dir
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: Always
+        serviceAccount: zammad-elasticsearch-master
+        serviceAccountName: zammad-elasticsearch-master
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir: {}
+          name: empty-dir
+    updateStrategy:
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 8Gi
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: zammad-elasticsearch-master-d7dd565b8
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: zammad-elasticsearch-master-d7dd565b8
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: primary
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/version: 17.5.0
+      helm.sh/chart: postgresql-16.7.21
+    name: zammad-postgresql
+    namespace: tickets
+    resourceVersion: "28897"
+    uid: 851b8fc7-2c47-438a-b4b2-f4ad77d32c08
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: primary
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: postgresql
+    serviceName: zammad-postgresql-hl
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: primary
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: postgresql
+          app.kubernetes.io/version: 17.5.0
+          helm.sh/chart: postgresql-16.7.21
+        name: zammad-postgresql
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: primary
+                    app.kubernetes.io/instance: zammad
+                    app.kubernetes.io/name: postgresql
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        automountServiceAccountToken: false
+        containers:
+        - env:
+          - name: BITNAMI_DEBUG
+            value: "false"
+          - name: POSTGRESQL_PORT_NUMBER
+            value: "5432"
+          - name: POSTGRESQL_VOLUME_DIR
+            value: /bitnami/postgresql
+          - name: PGDATA
+            value: /bitnami/postgresql/data
+          - name: POSTGRES_USER
+            value: zammad
+          - name: POSTGRES_PASSWORD_FILE
+            value: /opt/bitnami/postgresql/secrets/password
+          - name: POSTGRES_POSTGRES_PASSWORD_FILE
+            value: /opt/bitnami/postgresql/secrets/postgres-password
+          - name: POSTGRES_DATABASE
+            value: zammad_production
+          - name: POSTGRESQL_ENABLE_LDAP
+            value: "no"
+          - name: POSTGRESQL_ENABLE_TLS
+            value: "no"
+          - name: POSTGRESQL_LOG_HOSTNAME
+            value: "false"
+          - name: POSTGRESQL_LOG_CONNECTIONS
+            value: "false"
+          - name: POSTGRESQL_LOG_DISCONNECTIONS
+            value: "false"
+          - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
+            value: "off"
+          - name: POSTGRESQL_CLIENT_MIN_MESSAGES
+            value: error
+          - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
+            value: pgaudit
+          image: docker.io/bitnamilegacy/postgresql:17.5.0-debian-12-r20
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - exec pg_isready -U "zammad" -d "dbname=zammad_production" -h 127.0.0.1
+                -p 5432
+            failureThreshold: 6
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: postgresql
+          ports:
+          - containerPort: 5432
+            name: tcp-postgresql
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - -e
+              - |
+                exec pg_isready -U "zammad" -d "dbname=zammad_production" -h 127.0.0.1 -p 5432
+            failureThreshold: 6
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: 150m
+              ephemeral-storage: 2Gi
+              memory: 192Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 50Mi
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: empty-dir
+            subPath: tmp-dir
+          - mountPath: /opt/bitnami/postgresql/conf
+            name: empty-dir
+            subPath: app-conf-dir
+          - mountPath: /opt/bitnami/postgresql/tmp
+            name: empty-dir
+            subPath: app-tmp-dir
+          - mountPath: /opt/bitnami/postgresql/secrets/
+            name: postgresql-password
+          - mountPath: /dev/shm
+            name: dshm
+          - mountPath: /bitnami/postgresql
+            name: data
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: Always
+        serviceAccount: zammad-postgresql
+        serviceAccountName: zammad-postgresql
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir: {}
+          name: empty-dir
+        - name: postgresql-password
+          secret:
+            defaultMode: 420
+            secretName: zammad-postgresql
+        - emptyDir:
+            medium: Memory
+          name: dshm
+    updateStrategy:
+      rollingUpdate:
+        partition: 0
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 8Gi
+        storageClassName: local-path
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: zammad-postgresql-8486dbb578
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: zammad-postgresql-8486dbb578
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:35Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/version: 7.4.3
+      helm.sh/chart: redis-20.13.4
+    name: zammad-redis-master
+    namespace: tickets
+    resourceVersion: "28930"
+    uid: c96575b2-b4f9-4d02-b980-25a5598ed1ae
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/component: master
+        app.kubernetes.io/instance: zammad
+        app.kubernetes.io/name: redis
+    serviceName: zammad-redis-headless
+    template:
+      metadata:
+        annotations:
+          checksum/configmap: 2a9ab4a5432825504d910f022638674ce88eaefe9f9f595ad8bc107377d104fb
+          checksum/health: aff24913d801436ea469d8d374b2ddb3ec4c43ee7ab24663d5f8ff1a1b6991a9
+          checksum/scripts: 0717e77fd3bb941f602860e9be4f2ed87b481cddeadf37be463f8512ecde0c3e
+          checksum/secret: ef92bff2cf1b4074dfd7636f22655a1c5eceb22265d3927927c4826989ea1523
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: master
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: redis
+          app.kubernetes.io/version: 7.4.3
+          helm.sh/chart: redis-20.13.4
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: master
+                    app.kubernetes.io/instance: zammad
+                    app.kubernetes.io/name: redis
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        automountServiceAccountToken: false
+        containers:
+        - args:
+          - -ec
+          - /opt/bitnami/scripts/start-scripts/start-master.sh
+          command:
+          - /bin/bash
+          env:
+          - name: BITNAMI_DEBUG
+            value: "false"
+          - name: REDIS_REPLICATION_MODE
+            value: master
+          - name: ALLOW_EMPTY_PASSWORD
+            value: "no"
+          - name: REDIS_PASSWORD_FILE
+            value: /opt/bitnami/redis/secrets/redis-password
+          - name: REDIS_TLS_ENABLED
+            value: "no"
+          - name: REDIS_PORT
+            value: "6379"
+          image: docker.io/bitnamilegacy/redis:7.4.3-debian-12-r0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+              - /bin/bash
+              - -ec
+              - /health/ping_liveness_local.sh 5
+            failureThreshold: 5
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 6
+          name: redis
+          ports:
+          - containerPort: 6379
+            name: redis
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /bin/bash
+              - -ec
+              - /health/ping_readiness_local.sh 1
+            failureThreshold: 5
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 2
+          resources:
+            limits:
+              cpu: 150m
+              ephemeral-storage: 2Gi
+              memory: 192Mi
+            requests:
+              cpu: 100m
+              ephemeral-storage: 50Mi
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 1001
+            runAsNonRoot: true
+            runAsUser: 1001
+            seLinuxOptions: {}
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /opt/bitnami/scripts/start-scripts
+            name: start-scripts
+          - mountPath: /health
+            name: health
+          - mountPath: /opt/bitnami/redis/secrets/
+            name: redis-password
+          - mountPath: /data
+            name: redis-data
+          - mountPath: /opt/bitnami/redis/mounted-etc
+            name: config
+          - mountPath: /opt/bitnami/redis/etc/
+            name: empty-dir
+            subPath: app-conf-dir
+          - mountPath: /tmp
+            name: empty-dir
+            subPath: tmp-dir
+        dnsPolicy: ClusterFirst
+        enableServiceLinks: true
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1001
+          fsGroupChangePolicy: Always
+        serviceAccount: zammad-redis-master
+        serviceAccountName: zammad-redis-master
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 493
+            name: zammad-redis-scripts
+          name: start-scripts
+        - configMap:
+            defaultMode: 493
+            name: zammad-redis-health
+          name: health
+        - name: redis-password
+          secret:
+            defaultMode: 420
+            items:
+            - key: redis-password
+              path: redis-password
+            secretName: zammad-redis
+        - configMap:
+            defaultMode: 420
+            name: zammad-redis-configuration
+          name: config
+        - emptyDir: {}
+          name: empty-dir
+    updateStrategy:
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/component: master
+          app.kubernetes.io/instance: zammad
+          app.kubernetes.io/name: redis
+        name: redis-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 8Gi
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: zammad-redis-master-857cf5695f
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: zammad-redis-master-857cf5695f
+    updatedReplicas: 1
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: elasticsearch
+      app.kubernetes.io/version: 8.18.0
+      helm.sh/chart: elasticsearch-21.6.3
+    name: zammad-elasticsearch
+    namespace: tickets
+    resourceVersion: "28546"
+    uid: 1ef2aac7-df43-4ad6-9d95-9005d152a1d4
+  spec:
+    clusterIP: 10.43.99.132
+    clusterIPs:
+    - 10.43.99.132
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: tcp-rest-api
+      port: 9200
+      protocol: TCP
+      targetPort: rest-api
+    - name: tcp-transport
+      port: 9300
+      protocol: TCP
+      targetPort: 9300
+    selector:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: elasticsearch
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: elasticsearch
+      app.kubernetes.io/version: 8.18.0
+      helm.sh/chart: elasticsearch-21.6.3
+    name: zammad-elasticsearch-master-hl
+    namespace: tickets
+    resourceVersion: "28516"
+    uid: adaae9d7-5c3b-40d0-9b04-d5f30756d65e
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: tcp-rest-api
+      port: 9200
+      protocol: TCP
+      targetPort: rest-api
+    - name: tcp-transport
+      port: 9300
+      protocol: TCP
+      targetPort: transport
+    publishNotReadyAddresses: true
+    selector:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: elasticsearch
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: memcached
+      app.kubernetes.io/version: 1.6.38
+      helm.sh/chart: memcached-7.9.3
+    name: zammad-memcached
+    namespace: tickets
+    resourceVersion: "28564"
+    uid: 44449877-3971-4665-af50-97388aa50939
+  spec:
+    clusterIP: 10.43.47.79
+    clusterIPs:
+    - 10.43.47.79
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: memcache
+      port: 11211
+      protocol: TCP
+      targetPort: memcache
+    publishNotReadyAddresses: true
+    selector:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: memcached
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-nginx
+    namespace: tickets
+    resourceVersion: "28557"
+    uid: fdfbb7e4-46c7-49d0-b7f0-ce625d9e935c
+  spec:
+    clusterIP: 10.43.185.227
+    clusterIPs:
+    - 10.43.185.227
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: http
+    selector:
+      app.kubernetes.io/component: zammad-nginx
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: zammad
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/component: primary
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/version: 17.5.0
+      helm.sh/chart: postgresql-16.7.21
+    name: zammad-postgresql
+    namespace: tickets
+    resourceVersion: "28555"
+    uid: 867220ab-b3b1-43dd-8112-5dda608910d3
+  spec:
+    clusterIP: 10.43.181.164
+    clusterIPs:
+    - 10.43.181.164
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: tcp-postgresql
+      port: 5432
+      protocol: TCP
+      targetPort: tcp-postgresql
+    selector:
+      app.kubernetes.io/component: primary
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: postgresql
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/component: primary
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/version: 17.5.0
+      helm.sh/chart: postgresql-16.7.21
+    name: zammad-postgresql-hl
+    namespace: tickets
+    resourceVersion: "28517"
+    uid: 24427713-bb4c-4f3a-8d94-8aa828de26b4
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: tcp-postgresql
+      port: 5432
+      protocol: TCP
+      targetPort: tcp-postgresql
+    publishNotReadyAddresses: true
+    selector:
+      app.kubernetes.io/component: primary
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: postgresql
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-railsserver
+    namespace: tickets
+    resourceVersion: "28533"
+    uid: 3e324b6d-a31a-4585-bc5c-dd7c0d12b2d3
+  spec:
+    clusterIP: 10.43.57.116
+    clusterIPs:
+    - 10.43.57.116
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 3000
+      protocol: TCP
+      targetPort: 3000
+    selector:
+      app.kubernetes.io/component: zammad-railsserver
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: zammad
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/version: 7.4.3
+      helm.sh/chart: redis-20.13.4
+    name: zammad-redis-headless
+    namespace: tickets
+    resourceVersion: "28519"
+    uid: ab0ca7ee-2abd-4aa2-9c27-1526d2d60a87
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: tcp-redis
+      port: 6379
+      protocol: TCP
+      targetPort: redis
+    selector:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: redis
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/version: 7.4.3
+      helm.sh/chart: redis-20.13.4
+    name: zammad-redis-master
+    namespace: tickets
+    resourceVersion: "28542"
+    uid: 647167a4-03ce-435a-b046-1fef1516cf5d
+  spec:
+    clusterIP: 10.43.50.107
+    clusterIPs:
+    - 10.43.50.107
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: tcp-redis
+      port: 6379
+      protocol: TCP
+      targetPort: redis
+    selector:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: redis
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-websocket
+    namespace: tickets
+    resourceVersion: "28532"
+    uid: 4dc306e6-0a08-4117-9d2a-b22329865d86
+  spec:
+    clusterIP: 10.43.167.99
+    clusterIPs:
+    - 10.43.167.99
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 6042
+      protocol: TCP
+      targetPort: 6042
+    selector:
+      app.kubernetes.io/component: zammad-websocket
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/name: zammad
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+      dmVyLWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAATnFiU7bBSGw1xnMhMzKu8k+B3pMR+L92SW7nRee1ix
+      lnGEK8372uuBcF8zzrJGnyyma4jMlNPjE6wgZuPi6xMlo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK0kEelYwOY3kgq3QQ8bP
+      NVTy4HEwCgYIKoZIzj0EAwIDSQAwRgIhAMGD2PiWLWEmqssuAOFSqbIZ5w1mpVav
+      Dg26sRLLcrgqAiEAuToBfY7Yafg5C018WzHmZhts9/07vJegDAfzl0AXUgA=
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2025-12-24T20:19:25Z"
+    name: kube-root-ca.crt
+    namespace: tickets
+    resourceVersion: "455"
+    uid: c02b75fe-94ab-474b-b632-5b4f06412d9f
+- apiVersion: v1
+  data:
+    elasticsearch-init: |-
+      #!/bin/bash
+      set -e
+
+      ELASTICSEARCH_URL=http://zammad-elasticsearch:9200
+      bundle exec rails r "Setting.set('es_url', '${ELASTICSEARCH_URL}')"
+
+      ELASTICSEARCH_USER=${ELASTICSEARCH_USER:-}
+      if [ -n "${ELASTICSEARCH_USER}" ] && [ -n "${ELASTICSEARCH_PASSWORD}" ]; then
+          bundle exec rails r "Setting.set('es_user', '${ELASTICSEARCH_USER}'); Setting.set('es_password', '${ELASTICSEARCH_PASSWORD}')"
+      fi
+
+
+      echo "Checking if an elasticsearch index already exists…"
+
+      # Ensure ES connectivity, as SearchIndexBackend.index_exists? swallows internal errors.
+      bundle exec rails r "SearchIndexBackend.version"
+
+      if bundle exec rails r "SearchIndexBackend.index_exists?('Ticket') || exit(1)"
+      then
+        echo "Elasticsearch index exists, no automatic reindexing is needed."
+      else
+        echo "Elasticsearch index does not exist yet, create it now…"
+        bundle exec rake zammad:searchindex:rebuild
+      fi
+
+
+      echo "elasticsearch init complete :)"
+    postgresql-init: |-
+      #!/bin/bash
+      set -e
+
+      if ! (bundle exec rails r 'puts User.any?' 2> /dev/null | grep -q true); then
+          bundle exec rake db:migrate db:seed
+      else
+          echo Executing migrations...
+          bundle exec rake db:migrate
+
+          echo Synchronizing locales and translations...
+          bundle exec rails r "Locale.sync; Translation.sync"
+      fi
+
+      echo "postgresql init complete :)"
+    postgresql-init-post: |-
+      #!/bin/bash
+      set -e
+
+      # Run a rails command to ensure the database is up and running.
+      bundle exec rails r "true"
+
+      echo "init sequence complete :)"
+    zammad-init: |-
+      #!/bin/bash
+      set -e
+
+      echo "zammad init complete :)"
+  kind: ConfigMap
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-init
+    namespace: tickets
+    resourceVersion: "28507"
+    uid: 98d84e59-d5a0-4725-bf28-16178a8454b9
+- apiVersion: v1
+  data:
+    default: "#\n# kubernetes nginx config for zammad\n#\n\nserver_tokens off;\n\nupstream
+      zammad-railsserver {\n    server zammad-railsserver:3000;\n}\n\nupstream zammad-websocket
+      {\n    server zammad-websocket:6042;\n}\n\nserver {\n    listen 8080;\n    listen
+      [::]:8080;\n\n    server_name _;\n\n    root /opt/zammad/public;\n\n    client_body_temp_path
+      /tmp 1 2;\n    fastcgi_temp_path /tmp 1 2;\n    proxy_temp_path /tmp 1 2;\n
+      \   scgi_temp_path /tmp 1 2;\n    uwsgi_temp_path /tmp 1 2;\n\n    access_log
+      /dev/stdout;\n    error_log  /dev/stderr;\n\n    client_max_body_size 50M;\n
+      \   \n\n    location ~ ^/(assets/|robots.txt|humans.txt|favicon.ico) {\n        expires
+      max;\n    }\n\n    location /ws {\n        proxy_http_version 1.1;\n        proxy_set_header
+      Upgrade $http_upgrade;\n        proxy_set_header Connection \"Upgrade\";\n        proxy_set_header
+      Host $http_host;\n        proxy_set_header CLIENT_IP $remote_addr;\n        proxy_set_header
+      X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_read_timeout 86400;\n
+      \       proxy_pass http://zammad-websocket;\n    }\n\n    location /cable {\n
+      \       proxy_http_version 1.1;\n        proxy_set_header Upgrade $http_upgrade;\n
+      \       proxy_set_header Connection \"Upgrade\";\n        proxy_set_header Host
+      $http_host;\n        proxy_set_header CLIENT_IP $remote_addr;\n        proxy_set_header
+      X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_read_timeout 86400;\n
+      \       proxy_pass http://zammad-railsserver;\n    }\n\n    location / {\n        proxy_http_version
+      1.1;\n        proxy_set_header Host $http_host;\n        proxy_set_header CLIENT_IP
+      $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n
+      \       proxy_read_timeout 180;\n        proxy_pass http://zammad-railsserver;\n\n
+      \       gzip on;\n        gzip_types text/plain text/xml text/css image/svg+xml
+      application/javascript application/x-javascript application/json application/xml;\n
+      \       gzip_proxied any;\n    }\n}"
+    nginx.conf: |-
+      worker_processes auto;
+
+      pid /tmp/nginx.pid;
+
+      include /etc/nginx/modules-enabled/*.conf;
+
+      events {
+          worker_connections 768;
+      }
+
+      http {
+          sendfile on;
+          tcp_nopush on;
+          types_hash_max_size 2048;
+
+          include /etc/nginx/mime.types;
+          default_type application/octet-stream;
+
+          ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+          ssl_prefer_server_ciphers on;
+
+          access_log /dev/stdout;
+          error_log /dev/stdout;
+
+          gzip on;
+
+          include /etc/nginx/conf.d/*.conf;
+          include /etc/nginx/sites-enabled/*;
+      }
+  kind: ConfigMap
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: zammad
+      app.kubernetes.io/version: 6.5.2-46
+      helm.sh/chart: zammad-15.6.0
+    name: zammad-nginx
+    namespace: tickets
+    resourceVersion: "28513"
+    uid: 07c97da3-810e-4b0c-bd9f-8709344da56a
+- apiVersion: v1
+  data:
+    master.conf: |-
+      dir /data
+      # User-supplied master configuration:
+      rename-command FLUSHDB ""
+      rename-command FLUSHALL ""
+      # End of master configuration
+    redis.conf: |-
+      # User-supplied common configuration:
+      # Enable AOF https://redis.io/topics/persistence#append-only-file
+      appendonly yes
+      # Disable RDB persistence, AOF persistence already enabled.
+      save ""
+      # End of common configuration
+    replica.conf: |-
+      dir /data
+      # User-supplied replica configuration:
+      rename-command FLUSHDB ""
+      rename-command FLUSHALL ""
+      # End of replica configuration
+    users.acl: ""
+  kind: ConfigMap
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/version: 7.4.3
+      helm.sh/chart: redis-20.13.4
+    name: zammad-redis-configuration
+    namespace: tickets
+    resourceVersion: "28508"
+    uid: c570e2d0-8870-4710-aec1-d34f83ca9c9b
+- apiVersion: v1
+  data:
+    ping_liveness_local.sh: |-
+      #!/bin/bash
+
+      [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+      [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+      response=$(
+        timeout -s 15 $1 \
+        redis-cli \
+          -h localhost \
+          -p $REDIS_PORT \
+          ping
+      )
+      if [ "$?" -eq "124" ]; then
+        echo "Timed out"
+        exit 1
+      fi
+      responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
+      if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ] && [ "$responseFirstWord" != "MASTERDOWN" ]; then
+        echo "$response"
+        exit 1
+      fi
+    ping_liveness_local_and_master.sh: |-
+      script_dir="$(dirname "$0")"
+      exit_status=0
+      "$script_dir/ping_liveness_local.sh" $1 || exit_status=$?
+      "$script_dir/ping_liveness_master.sh" $1 || exit_status=$?
+      exit $exit_status
+    ping_liveness_master.sh: |-
+      #!/bin/bash
+
+      [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+      [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+      response=$(
+        timeout -s 15 $1 \
+        redis-cli \
+          -h $REDIS_MASTER_HOST \
+          -p $REDIS_MASTER_PORT_NUMBER \
+          ping
+      )
+      if [ "$?" -eq "124" ]; then
+        echo "Timed out"
+        exit 1
+      fi
+      responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
+      if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ]; then
+        echo "$response"
+        exit 1
+      fi
+    ping_readiness_local.sh: |-
+      #!/bin/bash
+
+      [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+      [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+      response=$(
+        timeout -s 15 $1 \
+        redis-cli \
+          -h localhost \
+          -p $REDIS_PORT \
+          ping
+      )
+      if [ "$?" -eq "124" ]; then
+        echo "Timed out"
+        exit 1
+      fi
+      if [ "$response" != "PONG" ]; then
+        echo "$response"
+        exit 1
+      fi
+    ping_readiness_local_and_master.sh: |-
+      script_dir="$(dirname "$0")"
+      exit_status=0
+      "$script_dir/ping_readiness_local.sh" $1 || exit_status=$?
+      "$script_dir/ping_readiness_master.sh" $1 || exit_status=$?
+      exit $exit_status
+    ping_readiness_master.sh: |-
+      #!/bin/bash
+
+      [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+      [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+      response=$(
+        timeout -s 15 $1 \
+        redis-cli \
+          -h $REDIS_MASTER_HOST \
+          -p $REDIS_MASTER_PORT_NUMBER \
+          ping
+      )
+      if [ "$?" -eq "124" ]; then
+        echo "Timed out"
+        exit 1
+      fi
+      if [ "$response" != "PONG" ]; then
+        echo "$response"
+        exit 1
+      fi
+  kind: ConfigMap
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/version: 7.4.3
+      helm.sh/chart: redis-20.13.4
+    name: zammad-redis-health
+    namespace: tickets
+    resourceVersion: "28512"
+    uid: 89bde5da-cb61-4704-8542-d3e50cfbc78e
+- apiVersion: v1
+  data:
+    start-master.sh: |
+      #!/bin/bash
+
+      [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+      if [[ -f /opt/bitnami/redis/mounted-etc/master.conf ]];then
+          cp /opt/bitnami/redis/mounted-etc/master.conf /opt/bitnami/redis/etc/master.conf
+      fi
+      if [[ -f /opt/bitnami/redis/mounted-etc/redis.conf ]];then
+          cp /opt/bitnami/redis/mounted-etc/redis.conf /opt/bitnami/redis/etc/redis.conf
+      fi
+      if [[ -f /opt/bitnami/redis/mounted-etc/users.acl ]];then
+          cp /opt/bitnami/redis/mounted-etc/users.acl /opt/bitnami/redis/etc/users.acl
+      fi
+      ARGS=("--port" "${REDIS_PORT}")
+      ARGS+=("--requirepass" "${REDIS_PASSWORD}")
+      ARGS+=("--masterauth" "${REDIS_PASSWORD}")
+      ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
+      ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
+      exec redis-server "${ARGS[@]}"
+  kind: ConfigMap
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: zammad
+      meta.helm.sh/release-namespace: tickets
+    creationTimestamp: "2025-12-25T07:11:34Z"
+    labels:
+      app.kubernetes.io/instance: zammad
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/version: 7.4.3
+      helm.sh/chart: redis-20.13.4
+    name: zammad-redis-scripts
+    namespace: tickets
+    resourceVersion: "28511"
+    uid: cf680143-ad3b-429d-a03c-9870068760d9
+kind: List
+metadata:
+  resourceVersion: ""

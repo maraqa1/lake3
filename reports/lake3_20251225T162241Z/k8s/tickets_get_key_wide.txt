@@ -1,0 +1,51 @@
+NAME                               CLASS   HOSTS                 ADDRESS       PORTS     AGE
+ingress.networking.k8s.io/zammad   nginx   chart-example.local   37.27.4.125   80, 443   9h
+
+NAME                                     TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)             AGE   SELECTOR
+service/zammad-elasticsearch             ClusterIP   10.43.99.132    <none>        9200/TCP,9300/TCP   9h    app.kubernetes.io/component=master,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=elasticsearch
+service/zammad-elasticsearch-master-hl   ClusterIP   None            <none>        9200/TCP,9300/TCP   9h    app.kubernetes.io/component=master,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=elasticsearch
+service/zammad-memcached                 ClusterIP   10.43.47.79     <none>        11211/TCP           9h    app.kubernetes.io/instance=zammad,app.kubernetes.io/name=memcached
+service/zammad-nginx                     ClusterIP   10.43.185.227   <none>        8080/TCP            9h    app.kubernetes.io/component=zammad-nginx,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+service/zammad-postgresql                ClusterIP   10.43.181.164   <none>        5432/TCP            9h    app.kubernetes.io/component=primary,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=postgresql
+service/zammad-postgresql-hl             ClusterIP   None            <none>        5432/TCP            9h    app.kubernetes.io/component=primary,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=postgresql
+service/zammad-railsserver               ClusterIP   10.43.57.116    <none>        3000/TCP            9h    app.kubernetes.io/component=zammad-railsserver,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+service/zammad-redis-headless            ClusterIP   None            <none>        6379/TCP            9h    app.kubernetes.io/instance=zammad,app.kubernetes.io/name=redis
+service/zammad-redis-master              ClusterIP   10.43.50.107    <none>        6379/TCP            9h    app.kubernetes.io/component=master,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=redis
+service/zammad-websocket                 ClusterIP   10.43.167.99    <none>        6042/TCP            9h    app.kubernetes.io/component=zammad-websocket,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS           IMAGES                                                  SELECTOR
+deployment.apps/zammad-memcached     1/1     1            1           9h    memcached            docker.io/bitnamilegacy/memcached:1.6.38-debian-12-r8   app.kubernetes.io/instance=zammad,app.kubernetes.io/name=memcached
+deployment.apps/zammad-nginx         1/1     1            1           9h    zammad-nginx         ghcr.io/zammad/zammad:6.5.2-46                          app.kubernetes.io/component=zammad-nginx,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+deployment.apps/zammad-railsserver   1/1     1            1           9h    zammad-railsserver   ghcr.io/zammad/zammad:6.5.2-46                          app.kubernetes.io/component=zammad-railsserver,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+deployment.apps/zammad-scheduler     1/1     1            1           9h    zammad-scheduler     ghcr.io/zammad/zammad:6.5.2-46                          app.kubernetes.io/component=zammad-scheduler,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+deployment.apps/zammad-websocket     1/1     1            1           9h    zammad-websocket     ghcr.io/zammad/zammad:6.5.2-46                          app.kubernetes.io/component=zammad-websocket,app.kubernetes.io/instance=zammad,app.kubernetes.io/name=zammad
+
+NAME                                           READY   AGE   CONTAINERS      IMAGES
+statefulset.apps/zammad-elasticsearch-master   1/1     9h    elasticsearch   docker.io/bitnamilegacy/elasticsearch:8.18.0-debian-12-r2
+statefulset.apps/zammad-postgresql             1/1     9h    postgresql      docker.io/bitnamilegacy/postgresql:17.5.0-debian-12-r20
+statefulset.apps/zammad-redis-master           1/1     9h    redis           docker.io/bitnamilegacy/redis:7.4.3-debian-12-r0
+
+NAME                                   DATA   AGE
+configmap/kube-root-ca.crt             1      20h
+configmap/zammad-init                  4      9h
+configmap/zammad-nginx                 2      9h
+configmap/zammad-redis-configuration   4      9h
+configmap/zammad-redis-health          6      9h
+configmap/zammad-redis-scripts         1      9h
+
+NAME                                  TYPE                 DATA   AGE
+secret/sh.helm.release.v1.zammad.v1   helm.sh/release.v1   1      9h
+secret/zammad-postgresql              Opaque               2      9h
+secret/zammad-postgresql-pass         Opaque               1      9h
+secret/zammad-redis                   Opaque               1      9h
+secret/zammad-redis-pass              Opaque               1      9h
+
+NAME                                         SECRETS   AGE
+serviceaccount/default                       0         20h
+serviceaccount/zammad-elasticsearch-master   0         9h
+serviceaccount/zammad-memcached              0         9h
+serviceaccount/zammad-postgresql             0         9h
+serviceaccount/zammad-redis-master           0         9h
+
+NAME                                   SCHEDULE   TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE   CONTAINERS   IMAGES                           SELECTOR
+cronjob.batch/zammad-cronjob-reindex   @weekly    <none>     True      0        <none>          9h    reindex      ghcr.io/zammad/zammad:6.5.2-46   <none>

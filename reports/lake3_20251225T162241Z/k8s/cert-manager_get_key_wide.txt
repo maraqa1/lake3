@@ -1,0 +1,40 @@
+NAME                              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)            AGE   SELECTOR
+service/cert-manager              ClusterIP   10.43.187.165   <none>        9402/TCP           20h   app.kubernetes.io/component=controller,app.kubernetes.io/instance=cert-manager,app.kubernetes.io/name=cert-manager
+service/cert-manager-cainjector   ClusterIP   10.43.170.173   <none>        9402/TCP           20h   app.kubernetes.io/component=cainjector,app.kubernetes.io/instance=cert-manager,app.kubernetes.io/name=cainjector
+service/cert-manager-webhook      ClusterIP   10.43.194.55    <none>        443/TCP,9402/TCP   20h   app.kubernetes.io/component=webhook,app.kubernetes.io/instance=cert-manager,app.kubernetes.io/name=webhook
+
+NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS                IMAGES                                             SELECTOR
+deployment.apps/cert-manager              1/1     1            1           20h   cert-manager-controller   quay.io/jetstack/cert-manager-controller:v1.19.2   app.kubernetes.io/component=controller,app.kubernetes.io/instance=cert-manager,app.kubernetes.io/name=cert-manager
+deployment.apps/cert-manager-cainjector   1/1     1            1           20h   cert-manager-cainjector   quay.io/jetstack/cert-manager-cainjector:v1.19.2   app.kubernetes.io/component=cainjector,app.kubernetes.io/instance=cert-manager,app.kubernetes.io/name=cainjector
+deployment.apps/cert-manager-webhook      1/1     1            1           20h   cert-manager-webhook      quay.io/jetstack/cert-manager-webhook:v1.19.2      app.kubernetes.io/component=webhook,app.kubernetes.io/instance=cert-manager,app.kubernetes.io/name=webhook
+
+NAME                         DATA   AGE
+configmap/kube-root-ca.crt   1      20h
+
+NAME                                         TYPE                 DATA   AGE
+secret/cert-manager-webhook-ca               Opaque               3      20h
+secret/letsencrypt-http01-account-key        Opaque               1      20h
+secret/sh.helm.release.v1.cert-manager.v1    helm.sh/release.v1   1      20h
+secret/sh.helm.release.v1.cert-manager.v10   helm.sh/release.v1   1      59m
+secret/sh.helm.release.v1.cert-manager.v2    helm.sh/release.v1   1      19h
+secret/sh.helm.release.v1.cert-manager.v3    helm.sh/release.v1   1      19h
+secret/sh.helm.release.v1.cert-manager.v4    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.cert-manager.v5    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.cert-manager.v6    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.cert-manager.v7    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.cert-manager.v8    helm.sh/release.v1   1      17h
+secret/sh.helm.release.v1.cert-manager.v9    helm.sh/release.v1   1      17h
+
+NAME                                     SECRETS   AGE
+serviceaccount/cert-manager              0         20h
+serviceaccount/cert-manager-cainjector   0         20h
+serviceaccount/cert-manager-webhook      0         20h
+serviceaccount/default                   0         20h
+
+NAME                                                                  CREATED AT
+role.rbac.authorization.k8s.io/cert-manager-tokenrequest              2025-12-24T20:19:56Z
+role.rbac.authorization.k8s.io/cert-manager-webhook:dynamic-serving   2025-12-24T20:19:56Z
+
+NAME                                                                         ROLE                                        AGE   USERS   GROUPS   SERVICEACCOUNTS
+rolebinding.rbac.authorization.k8s.io/cert-manager-tokenrequest              Role/cert-manager-tokenrequest              20h                    cert-manager/cert-manager
+rolebinding.rbac.authorization.k8s.io/cert-manager-webhook:dynamic-serving   Role/cert-manager-webhook:dynamic-serving   20h                    cert-manager/cert-manager-webhook

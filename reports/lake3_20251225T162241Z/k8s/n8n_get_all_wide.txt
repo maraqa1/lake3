@@ -1,0 +1,12 @@
+NAME                       READY   STATUS    RESTARTS   AGE   IP            NODE            NOMINATED NODE   READINESS GATES
+pod/n8n-7754fbb8b7-6blbc   1/1     Running   0          9h    10.42.0.118   datalake-srv3   <none>           <none>
+
+NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/n8n   ClusterIP   10.43.208.12   <none>        80/TCP    17h   app=n8n
+
+NAME                  READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES             SELECTOR
+deployment.apps/n8n   1/1     1            1           17h   n8n          n8nio/n8n:latest   app=n8n
+
+NAME                             DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES             SELECTOR
+replicaset.apps/n8n-7754fbb8b7   1         1         1       9h    n8n          n8nio/n8n:latest   app=n8n,pod-template-hash=7754fbb8b7
+replicaset.apps/n8n-7dcf6869cc   0         0         0       17h   n8n          n8nio/n8n:latest   app=n8n,pod-template-hash=7dcf6869cc

@@ -1,0 +1,11 @@
+NAME                         DATA   AGE
+configmap/kube-root-ca.crt   1      20h
+
+NAME                TYPE     DATA   AGE
+secret/dbt-secret   Opaque   7      9h
+
+NAME                     SECRETS   AGE
+serviceaccount/default   0         20h
+
+NAME                        SCHEDULE    TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE   CONTAINERS   IMAGES                                SELECTOR
+cronjob.batch/dbt-nightly   0 2 * * *   <none>     False     0        <none>          8h    dbt          ghcr.io/dbt-labs/dbt-postgres:1.8.0   <none>

@@ -1,0 +1,2766 @@
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{},"name":"airbyte","namespace":"airbyte"},"spec":{"ingressClassName":"nginx","rules":[{"host":"airbyte.lake3.opendatalake.com","http":{"paths":[{"backend":{"service":{"name":"airbyte-airbyte-connector-builder-server-svc","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}],"tls":[{"hosts":["airbyte.lake3.opendatalake.com"],"secretName":"airbyte-tls"}]}}
+    creationTimestamp: "2025-12-24T21:40:52Z"
+    generation: 1
+    name: airbyte
+    namespace: airbyte
+    resourceVersion: "39217"
+    uid: ee5f5bbf-9729-41e5-8a1e-0c535e1ab2b7
+  spec:
+    ingressClassName: nginx
+    rules:
+    - host: airbyte.lake3.opendatalake.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: airbyte-airbyte-connector-builder-server-svc
+              port:
+                number: 80
+          path: /
+          pathType: Prefix
+    tls:
+    - hosts:
+      - airbyte.lake3.opendatalake.com
+      secretName: airbyte-tls
+  status:
+    loadBalancer:
+      ingress:
+      - ip: 37.27.4.125
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: connector-builder-server
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: connector-builder-server-1.9.2
+    name: airbyte-connector-builder-server
+    namespace: airbyte
+    resourceVersion: "2673"
+    uid: 82f149cc-f4a2-4578-9d72-a8f1faded73b
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: connector-builder-server
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: connector-builder-server
+      spec:
+        containers:
+        - env:
+          - name: AIRBYTE_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_VERSION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_EDITION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_EDITION
+                name: airbyte-airbyte-env
+          - name: MANIFEST_SERVER_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: MANIFEST_SERVER_API_HOST
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STEP
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STEP
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_OTLP_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_OTLP_ENABLED
+                name: airbyte-airbyte-env
+          - name: OTEL_COLLECTOR_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: OTEL_COLLECTOR_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_FLAVOR
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_FLAVOR
+                name: airbyte-airbyte-env
+          - name: SEGMENT_WRITE_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: SEGMENT_WRITE_KEY
+                name: airbyte-airbyte-env
+          - name: STATSD_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_HOST
+                name: airbyte-airbyte-env
+          - name: STATSD_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_PORT
+                name: airbyte-airbyte-env
+          - name: TRACKING_STRATEGY
+            valueFrom:
+              configMapKeyRef:
+                key: TRACKING_STRATEGY
+                name: airbyte-airbyte-env
+          image: airbyte/connector-builder-server:2.0.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /v1/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: airbyte-connector-builder-server
+          ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /v1/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:44:14Z"
+      lastUpdateTime: "2025-12-24T20:44:14Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:43:26Z"
+      lastUpdateTime: "2025-12-24T20:44:14Z"
+      message: ReplicaSet "airbyte-connector-builder-server-858b57b996" has successfully
+        progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: cron
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: cron-1.9.2
+    name: airbyte-cron
+    namespace: airbyte
+    resourceVersion: "2596"
+    uid: 3ca6b78b-b307-469c-8e8f-8353f30ad288
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: cron
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: cron
+      spec:
+        automountServiceAccountToken: true
+        containers:
+        - env:
+          - name: AIRBYTE_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_VERSION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_EDITION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_EDITION
+                name: airbyte-airbyte-env
+          - name: AB_JWT_SIGNATURE_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: jwt-signature-secret
+                name: airbyte-auth-secrets
+          - name: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STEP
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STEP
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_OTLP_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_OTLP_ENABLED
+                name: airbyte-airbyte-env
+          - name: OTEL_COLLECTOR_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: OTEL_COLLECTOR_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_FLAVOR
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_FLAVOR
+                name: airbyte-airbyte-env
+          - name: MICRONAUT_ENVIRONMENTS
+            valueFrom:
+              configMapKeyRef:
+                key: CRON_MICRONAUT_ENVIRONMENTS
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_HOST
+                name: airbyte-airbyte-env
+          - name: SEGMENT_WRITE_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: SEGMENT_WRITE_KEY
+                name: airbyte-airbyte-env
+          - name: STATSD_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_HOST
+                name: airbyte-airbyte-env
+          - name: STATSD_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_PORT
+                name: airbyte-airbyte-env
+          - name: TRACKING_STRATEGY
+            valueFrom:
+              configMapKeyRef:
+                key: TRACKING_STRATEGY
+                name: airbyte-airbyte-env
+          - name: WORKFLOW_FAILURE_RESTART_DELAY_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: WORKFLOW_FAILURE_RESTART_DELAY_SECONDS
+                name: airbyte-airbyte-env
+          - name: WORKLOAD_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: WORKLOAD_API_HOST
+                name: airbyte-airbyte-env
+          - name: WORKSPACE_DOCKER_MOUNT
+            valueFrom:
+              configMapKeyRef:
+                key: WORKSPACE_DOCKER_MOUNT
+                name: airbyte-airbyte-env
+          - name: WORKSPACE_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: WORKSPACE_ROOT
+                name: airbyte-airbyte-env
+          - name: CONNECTOR_REGISTRY_SEED_PROVIDER
+            valueFrom:
+              configMapKeyRef:
+                key: CONNECTOR_REGISTRY_SEED_PROVIDER
+                name: airbyte-airbyte-env
+          - name: UPDATE_DEFINITIONS_CRON_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: UPDATE_DEFINITIONS_CRON_ENABLED
+                name: airbyte-airbyte-env
+          - name: SECRET_PERSISTENCE
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_HOST
+                name: airbyte-airbyte-env
+          - name: DATABASE_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_PORT
+                name: airbyte-airbyte-env
+          - name: DATABASE_DB
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_DB
+                name: airbyte-airbyte-env
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_USER
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_PASSWORD
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_URL
+                name: airbyte-airbyte-env
+          image: airbyte/cron:2.0.1
+          imagePullPolicy: IfNotPresent
+          name: airbyte-cron
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:43:38Z"
+      lastUpdateTime: "2025-12-24T20:43:38Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:43:26Z"
+      lastUpdateTime: "2025-12-24T20:43:38Z"
+      message: ReplicaSet "airbyte-cron-7cf4886f84" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "21"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 21
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: server
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: server-1.9.2
+    name: airbyte-server
+    namespace: airbyte
+    resourceVersion: "11157"
+    uid: fd55d094-6206-4ffb-96a3-95e845482442
+  spec:
+    minReadySeconds: 30
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: server
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2025-12-24T21:44:11Z"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: server
+      spec:
+        containers:
+        - env:
+          - name: LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                key: LOG_LEVEL
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_API_HOST
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_VERSION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_EDITION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_EDITION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_URL
+                name: airbyte-airbyte-env
+          - name: CONFIG_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIG_ROOT
+                name: airbyte-airbyte-env
+          - name: MANIFEST_SERVER_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: MANIFEST_SERVER_API_HOST
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STEP
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STEP
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_OTLP_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_OTLP_ENABLED
+                name: airbyte-airbyte-env
+          - name: OTEL_COLLECTOR_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: OTEL_COLLECTOR_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_FLAVOR
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_FLAVOR
+                name: airbyte-airbyte-env
+          - name: STATSD_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_HOST
+                name: airbyte-airbyte-env
+          - name: STATSD_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_PORT
+                name: airbyte-airbyte-env
+          - name: MICRONAUT_ENVIRONMENTS
+            valueFrom:
+              configMapKeyRef:
+                key: SERVER_MICRONAUT_ENVIRONMENTS
+                name: airbyte-airbyte-env
+          - name: SEGMENT_WRITE_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: SEGMENT_WRITE_KEY
+                name: airbyte-airbyte-env
+          - name: TRACKING_STRATEGY
+            valueFrom:
+              configMapKeyRef:
+                key: TRACKING_STRATEGY
+                name: airbyte-airbyte-env
+          - name: WORKER_ENVIRONMENT
+            valueFrom:
+              configMapKeyRef:
+                key: WORKER_ENVIRONMENT
+                name: airbyte-airbyte-env
+          - name: WORKSPACE_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: WORKSPACE_ROOT
+                name: airbyte-airbyte-env
+          - name: WEBAPP_URL
+            valueFrom:
+              configMapKeyRef:
+                key: WEBAPP_URL
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_HOST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_CPU_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_CPU_REQUEST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_CPU_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_CPU_LIMIT
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_MEMORY_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_MEMORY_REQUEST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_MEMORY_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_MEMORY_LIMIT
+                name: airbyte-airbyte-env
+          - name: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: KEYCLOAK_INTERNAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: KEYCLOAK_INTERNAL_HOST
+                name: airbyte-airbyte-env
+          - name: CONNECTOR_BUILDER_SERVER_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: CONNECTOR_BUILDER_SERVER_API_HOST
+                name: airbyte-airbyte-env
+          - name: ENTERPRISE_SOURCE_STUBS_URL
+            valueFrom:
+              configMapKeyRef:
+                key: ENTERPRISE_SOURCE_STUBS_URL
+                name: airbyte-airbyte-env
+          - name: AB_JWT_SIGNATURE_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: jwt-signature-secret
+                name: airbyte-auth-secrets
+          - name: SECRET_PERSISTENCE
+          - name: S3_PATH_STYLE_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                key: S3_PATH_STYLE_ACCESS
+                name: airbyte-airbyte-env
+          - name: STORAGE_TYPE
+            value: MINIO
+          - name: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_LOG
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_LOG
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_STATE
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_STATE
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_WORKLOAD_OUTPUT
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_WORKLOAD_OUTPUT
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_AUDIT_LOGGING
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_AUDIT_LOGGING
+                name: airbyte-airbyte-env
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ACCESS_KEY_ID
+                name: airbyte-airbyte-secrets
+                optional: false
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ROOT_USER
+                name: openkpi-minio-secret
+                optional: false
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_SECRET_ACCESS_KEY
+                name: airbyte-airbyte-secrets
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ROOT_PASSWORD
+                name: openkpi-minio-secret
+                optional: false
+          - name: MINIO_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: MINIO_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_HOST
+                name: airbyte-airbyte-env
+          - name: DATABASE_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_PORT
+                name: airbyte-airbyte-env
+          - name: DATABASE_DB
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_DB
+                name: airbyte-airbyte-env
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_USER
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_PASSWORD
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_URL
+                name: airbyte-airbyte-env
+          image: airbyte/server:2.0.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/v1/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: airbyte-server-container
+          ports:
+          - containerPort: 8001
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /api/v1/health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T21:14:18Z"
+      lastUpdateTime: "2025-12-24T21:54:39Z"
+      message: ReplicaSet "airbyte-server-778cdbc6f4" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    - lastTransitionTime: "2025-12-24T23:04:25Z"
+      lastUpdateTime: "2025-12-24T23:04:25Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    observedGeneration: 21
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: temporal
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: temporal-1.9.2
+    name: airbyte-temporal
+    namespace: airbyte
+    resourceVersion: "2598"
+    uid: 397e9474-413e-4dda-b9bc-371be7a65c17
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: temporal
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: temporal
+      spec:
+        containers:
+        - env:
+          - name: AUTO_SETUP
+            value: "true"
+          - name: DB
+            value: postgres12
+          - name: BIND_ON_IP
+            value: 0.0.0.0
+          - name: TEMPORAL_BROADCAST_ADDRESS
+            value: 0.0.0.0
+          - name: DYNAMIC_CONFIG_FILE_PATH
+            value: config/dynamicconfig/development.yaml
+          - name: POSTGRES_SEEDS
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_HOST
+                name: airbyte-airbyte-env
+          - name: DB_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_PORT
+                name: airbyte-airbyte-env
+          - name: POSTGRES_USER
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_USER
+                name: airbyte-airbyte-secrets
+          - name: POSTGRES_PWD
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_PASSWORD
+                name: airbyte-airbyte-secrets
+          image: temporalio/auto-setup:1.27.2
+          imagePullPolicy: IfNotPresent
+          name: airbyte-temporal
+          ports:
+          - containerPort: 7233
+            protocol: TCP
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/temporal/config/dynamicconfig/
+            name: airbyte-temporal-dynamicconfig
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: development.yaml
+              path: development.yaml
+            name: airbyte-temporal-dynamicconfig
+          name: airbyte-temporal-dynamicconfig
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:43:38Z"
+      lastUpdateTime: "2025-12-24T20:43:38Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:43:26Z"
+      lastUpdateTime: "2025-12-24T20:43:38Z"
+      message: ReplicaSet "airbyte-temporal-6856cf9fff" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "9"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 9
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: worker
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: worker-1.9.2
+    name: airbyte-worker
+    namespace: airbyte
+    resourceVersion: "6936"
+    uid: ffb5f730-0fe8-4afa-bdc3-a49cb787b0ca
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: worker
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2025-12-24T21:44:11Z"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: worker
+      spec:
+        automountServiceAccountToken: true
+        containers:
+        - env:
+          - name: AIRBYTE_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_VERSION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_EDITION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_EDITION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_URL
+                name: airbyte-airbyte-env
+          - name: CONFIG_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIG_ROOT
+                name: airbyte-airbyte-env
+          - name: LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                key: LOG_LEVEL
+                name: airbyte-airbyte-env
+          - name: AB_JWT_SIGNATURE_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: jwt-signature-secret
+                name: airbyte-auth-secrets
+          - name: MICROMETER_METRICS_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STEP
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STEP
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_OTLP_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_OTLP_ENABLED
+                name: airbyte-airbyte-env
+          - name: OTEL_COLLECTOR_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: OTEL_COLLECTOR_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_FLAVOR
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_FLAVOR
+                name: airbyte-airbyte-env
+          - name: SEGMENT_WRITE_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: SEGMENT_WRITE_KEY
+                name: airbyte-airbyte-env
+          - name: STATSD_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_HOST
+                name: airbyte-airbyte-env
+          - name: STATSD_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_PORT
+                name: airbyte-airbyte-env
+          - name: TRACKING_STRATEGY
+            valueFrom:
+              configMapKeyRef:
+                key: TRACKING_STRATEGY
+                name: airbyte-airbyte-env
+          - name: WORKSPACE_DOCKER_MOUNT
+            value: workspace
+          - name: WORKSPACE_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: WORKSPACE_ROOT
+                name: airbyte-airbyte-env
+          - name: WEBAPP_URL
+            valueFrom:
+              configMapKeyRef:
+                key: WEBAPP_URL
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_HOST
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_WORKER_PORTS
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_WORKER_PORTS
+                name: airbyte-airbyte-env
+          - name: JOB_KUBE_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: JOB_MAIN_CONTAINER_CPU_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_CPU_REQUEST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_CPU_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_CPU_LIMIT
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_MEMORY_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_MEMORY_REQUEST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_MEMORY_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_MEMORY_LIMIT
+                name: airbyte-airbyte-env
+          - name: INTERNAL_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: INTERNAL_API_HOST
+                name: airbyte-airbyte-env
+          - name: WORKLOAD_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: WORKLOAD_API_HOST
+                name: airbyte-airbyte-env
+          - name: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: ACTIVITY_MAX_ATTEMPT
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVITY_MAX_ATTEMPT
+                name: airbyte-airbyte-env
+          - name: ACTIVITY_INITIAL_DELAY_BETWEEN_ATTEMPTS_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVITY_INITIAL_DELAY_BETWEEN_ATTEMPTS_SECONDS
+                name: airbyte-airbyte-env
+          - name: ACTIVITY_MAX_DELAY_BETWEEN_ATTEMPTS_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVITY_MAX_DELAY_BETWEEN_ATTEMPTS_SECONDS
+                name: airbyte-airbyte-env
+          - name: WORKFLOW_FAILURE_RESTART_DELAY_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: WORKFLOW_FAILURE_RESTART_DELAY_SECONDS
+                name: airbyte-airbyte-env
+          - name: SHOULD_RUN_NOTIFY_WORKFLOWS
+            valueFrom:
+              configMapKeyRef:
+                key: SHOULD_RUN_NOTIFY_WORKFLOWS
+                name: airbyte-airbyte-env
+          - name: MICRONAUT_ENVIRONMENTS
+            valueFrom:
+              configMapKeyRef:
+                key: WORKERS_MICRONAUT_ENVIRONMENTS
+                name: airbyte-airbyte-env
+          - name: SECRET_PERSISTENCE
+          - name: S3_PATH_STYLE_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                key: S3_PATH_STYLE_ACCESS
+                name: airbyte-airbyte-env
+          - name: STORAGE_TYPE
+            value: MINIO
+          - name: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_LOG
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_LOG
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_STATE
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_STATE
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_WORKLOAD_OUTPUT
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_WORKLOAD_OUTPUT
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_AUDIT_LOGGING
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_AUDIT_LOGGING
+                name: airbyte-airbyte-env
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ACCESS_KEY_ID
+                name: airbyte-airbyte-secrets
+                optional: false
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ROOT_USER
+                name: openkpi-minio-secret
+                optional: false
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_SECRET_ACCESS_KEY
+                name: airbyte-airbyte-secrets
+                optional: false
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ROOT_PASSWORD
+                name: openkpi-minio-secret
+                optional: false
+          - name: MINIO_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: MINIO_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_HOST
+                name: airbyte-airbyte-env
+          - name: DATABASE_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_PORT
+                name: airbyte-airbyte-env
+          - name: DATABASE_DB
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_DB
+                name: airbyte-airbyte-env
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_USER
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_PASSWORD
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_URL
+                name: airbyte-airbyte-env
+          - name: CONTAINER_ORCHESTRATOR_ENABLED
+            value: "true"
+          image: airbyte/worker:2.0.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: heartbeat
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: airbyte-worker-container
+          ports:
+          - containerPort: 9000
+            name: heartbeat
+            protocol: TCP
+          - containerPort: 9001
+            protocol: TCP
+          - containerPort: 9002
+            protocol: TCP
+          - containerPort: 9003
+            protocol: TCP
+          - containerPort: 9004
+            protocol: TCP
+          - containerPort: 9005
+            protocol: TCP
+          - containerPort: 9006
+            protocol: TCP
+          - containerPort: 9007
+            protocol: TCP
+          - containerPort: 9008
+            protocol: TCP
+          - containerPort: 9009
+            protocol: TCP
+          - containerPort: 9010
+            protocol: TCP
+          - containerPort: 9011
+            protocol: TCP
+          - containerPort: 9012
+            protocol: TCP
+          - containerPort: 9013
+            protocol: TCP
+          - containerPort: 9014
+            protocol: TCP
+          - containerPort: 9015
+            protocol: TCP
+          - containerPort: 9016
+            protocol: TCP
+          - containerPort: 9017
+            protocol: TCP
+          - containerPort: 9018
+            protocol: TCP
+          - containerPort: 9019
+            protocol: TCP
+          - containerPort: 9020
+            protocol: TCP
+          - containerPort: 9021
+            protocol: TCP
+          - containerPort: 9022
+            protocol: TCP
+          - containerPort: 9023
+            protocol: TCP
+          - containerPort: 9024
+            protocol: TCP
+          - containerPort: 9025
+            protocol: TCP
+          - containerPort: 9026
+            protocol: TCP
+          - containerPort: 9027
+            protocol: TCP
+          - containerPort: 9028
+            protocol: TCP
+          - containerPort: 9029
+            protocol: TCP
+          - containerPort: 9030
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /
+              port: heartbeat
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T21:17:45Z"
+      lastUpdateTime: "2025-12-24T21:17:45Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T21:14:18Z"
+      lastUpdateTime: "2025-12-24T21:44:24Z"
+      message: ReplicaSet "airbyte-worker-9864c7d7d" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 9
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: workload-api-server
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: workload-api-server-1.9.2
+    name: airbyte-workload-api-server
+    namespace: airbyte
+    resourceVersion: "2693"
+    uid: b36aad12-2c18-4b2d-91c0-c36b81e3304a
+  spec:
+    minReadySeconds: 30
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: workload-api-server
+    strategy:
+      rollingUpdate:
+        maxSurge: 100%
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: workload-api-server
+      spec:
+        containers:
+        - env:
+          - name: AIRBYTE_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_VERSION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_EDITION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_EDITION
+                name: airbyte-airbyte-env
+          - name: INTERNAL_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: INTERNAL_API_HOST
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_API_HOST
+                name: airbyte-airbyte-env
+          - name: MANIFEST_SERVER_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: MANIFEST_SERVER_API_HOST
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STEP
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STEP
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_OTLP_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_OTLP_ENABLED
+                name: airbyte-airbyte-env
+          - name: OTEL_COLLECTOR_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: OTEL_COLLECTOR_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_FLAVOR
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_FLAVOR
+                name: airbyte-airbyte-env
+          - name: SEGMENT_WRITE_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: SEGMENT_WRITE_KEY
+                name: airbyte-airbyte-env
+          - name: STATSD_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_HOST
+                name: airbyte-airbyte-env
+          - name: STATSD_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_PORT
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_HOST
+                name: airbyte-airbyte-env
+          - name: TRACKING_STRATEGY
+            valueFrom:
+              configMapKeyRef:
+                key: TRACKING_STRATEGY
+                name: airbyte-airbyte-env
+          - name: AB_JWT_SIGNATURE_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: jwt-signature-secret
+                name: airbyte-auth-secrets
+          - name: MICRONAUT_ENVIRONMENTS
+            valueFrom:
+              configMapKeyRef:
+                key: WORKERS_MICRONAUT_ENVIRONMENTS
+                name: airbyte-airbyte-env
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_HOST
+                name: airbyte-airbyte-env
+          - name: DATABASE_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_PORT
+                name: airbyte-airbyte-env
+          - name: DATABASE_DB
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_DB
+                name: airbyte-airbyte-env
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_USER
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_PASSWORD
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_URL
+                name: airbyte-airbyte-env
+          - name: S3_PATH_STYLE_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                key: S3_PATH_STYLE_ACCESS
+                name: airbyte-airbyte-env
+          - name: STORAGE_TYPE
+            value: MINIO
+          - name: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_LOG
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_LOG
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_STATE
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_STATE
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_WORKLOAD_OUTPUT
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_WORKLOAD_OUTPUT
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_AUDIT_LOGGING
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_AUDIT_LOGGING
+                name: airbyte-airbyte-env
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ACCESS_KEY_ID
+                name: airbyte-airbyte-secrets
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_SECRET_ACCESS_KEY
+                name: airbyte-airbyte-secrets
+          - name: MINIO_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: MINIO_ENDPOINT
+                name: airbyte-airbyte-env
+          image: airbyte/workload-api-server:2.0.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health/liveness
+              port: 8085
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          name: airbyte-workload-api-server-container
+          ports:
+          - containerPort: 8007
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health/liveness
+              port: 8085
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:44:27Z"
+      lastUpdateTime: "2025-12-24T20:44:27Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:43:26Z"
+      lastUpdateTime: "2025-12-24T20:44:27Z"
+      message: ReplicaSet "airbyte-workload-api-server-84f894d877" has successfully
+        progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "5"
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    generation: 5
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: workload-launcher
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: workload-launcher-1.9.2
+    name: airbyte-workload-launcher
+    namespace: airbyte
+    resourceVersion: "7037"
+    uid: 3abea03a-197f-4f78-95ef-86e0067cef6a
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: workload-launcher
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2025-12-24T21:44:11Z"
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: workload-launcher
+      spec:
+        automountServiceAccountToken: true
+        containers:
+        - env:
+          - name: RUNNING_TTL_MINUTES
+          - name: SUCCEEDED_TTL_MINUTES
+            value: "10"
+          - name: UNSUCCESSFUL_TTL_MINUTES
+            value: "120"
+          - name: AIRBYTE_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_VERSION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_EDITION
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_EDITION
+                name: airbyte-airbyte-env
+          - name: AIRBYTE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: AIRBYTE_URL
+                name: airbyte-airbyte-env
+          - name: DATA_PLANE_ID
+            value: local
+          - name: PUB_SUB_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: PUB_SUB_ENABLED
+                name: airbyte-airbyte-env
+          - name: PUB_SUB_TOPIC_NAME
+            valueFrom:
+              configMapKeyRef:
+                key: PUB_SUB_TOPIC_NAME
+                name: airbyte-airbyte-env
+          - name: CONFIG_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIG_ROOT
+                name: airbyte-airbyte-env
+          - name: DATABASE_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_HOST
+                name: airbyte-airbyte-env
+          - name: DATABASE_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_PORT
+                name: airbyte-airbyte-env
+          - name: DATABASE_DB
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_DB
+                name: airbyte-airbyte-env
+          - name: DATABASE_USER
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_USER
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: DATABASE_PASSWORD
+                name: airbyte-airbyte-secrets
+          - name: DATABASE_URL
+            valueFrom:
+              configMapKeyRef:
+                key: DATABASE_URL
+                name: airbyte-airbyte-env
+          - name: LOG_LEVEL
+            valueFrom:
+              configMapKeyRef:
+                key: LOG_LEVEL
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STEP
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STEP
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_OTLP_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_OTLP_ENABLED
+                name: airbyte-airbyte-env
+          - name: OTEL_COLLECTOR_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: OTEL_COLLECTOR_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_ENABLED
+                name: airbyte-airbyte-env
+          - name: MICROMETER_METRICS_STATSD_FLAVOR
+            valueFrom:
+              configMapKeyRef:
+                key: MICROMETER_METRICS_STATSD_FLAVOR
+                name: airbyte-airbyte-env
+          - name: SEGMENT_WRITE_KEY
+            valueFrom:
+              configMapKeyRef:
+                key: SEGMENT_WRITE_KEY
+                name: airbyte-airbyte-env
+          - name: STATSD_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_HOST
+                name: airbyte-airbyte-env
+          - name: STATSD_PORT
+            valueFrom:
+              configMapKeyRef:
+                key: STATSD_PORT
+                name: airbyte-airbyte-env
+          - name: TRACKING_STRATEGY
+            valueFrom:
+              configMapKeyRef:
+                key: TRACKING_STRATEGY
+                name: airbyte-airbyte-env
+          - name: WORKSPACE_DOCKER_MOUNT
+            value: workspace
+          - name: WORKSPACE_ROOT
+            valueFrom:
+              configMapKeyRef:
+                key: WORKSPACE_ROOT
+                name: airbyte-airbyte-env
+          - name: WEBAPP_URL
+            valueFrom:
+              configMapKeyRef:
+                key: WEBAPP_URL
+                name: airbyte-airbyte-env
+          - name: WORKLOAD_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: WORKLOAD_API_HOST
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_HOST
+                name: airbyte-airbyte-env
+          - name: TEMPORAL_WORKER_PORTS
+            valueFrom:
+              configMapKeyRef:
+                key: TEMPORAL_WORKER_PORTS
+                name: airbyte-airbyte-env
+          - name: JOB_KUBE_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: JOB_KUBE_SERVICEACCOUNT
+            value: airbyte-admin
+          - name: JOB_KUBE_CONNECTOR_IMAGE_REGISTRY
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_KUBE_CONNECTOR_IMAGE_REGISTRY
+                name: airbyte-airbyte-env
+          - name: CONNECTOR_SIDECAR_IMAGE
+            valueFrom:
+              configMapKeyRef:
+                key: CONNECTOR_SIDECAR_IMAGE
+                name: airbyte-airbyte-env
+          - name: WORKLOAD_INIT_IMAGE
+            valueFrom:
+              configMapKeyRef:
+                key: WORKLOAD_INIT_IMAGE
+                name: airbyte-airbyte-env
+          - name: CONNECTOR_PROFILER_IMAGE
+            valueFrom:
+              configMapKeyRef:
+                key: CONNECTOR_PROFILER_IMAGE
+                name: airbyte-airbyte-env
+          - name: CONTAINER_ORCHESTRATOR_IMAGE
+            valueFrom:
+              configMapKeyRef:
+                key: CONTAINER_ORCHESTRATOR_IMAGE
+                name: airbyte-airbyte-env
+          - name: JOB_KUBE_MAIN_CONTAINER_IMAGE_PULL_SECRET
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_KUBE_MAIN_CONTAINER_IMAGE_PULL_SECRET
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_CPU_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_CPU_REQUEST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_CPU_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_CPU_LIMIT
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_MEMORY_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_MEMORY_REQUEST
+                name: airbyte-airbyte-env
+          - name: JOB_MAIN_CONTAINER_MEMORY_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_MAIN_CONTAINER_MEMORY_LIMIT
+                name: airbyte-airbyte-env
+          - name: JOB_KUBE_LOCAL_VOLUME_ENABLED
+            valueFrom:
+              configMapKeyRef:
+                key: JOB_KUBE_LOCAL_VOLUME_ENABLED
+                name: airbyte-airbyte-env
+          - name: KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS
+            valueFrom:
+              configMapKeyRef:
+                key: KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS
+                name: airbyte-airbyte-env
+          - name: INTERNAL_API_HOST
+            valueFrom:
+              configMapKeyRef:
+                key: INTERNAL_API_HOST
+                name: airbyte-airbyte-env
+          - name: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+            valueFrom:
+              configMapKeyRef:
+                key: JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION
+                name: airbyte-airbyte-env
+          - name: ACTIVITY_MAX_ATTEMPT
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVITY_MAX_ATTEMPT
+                name: airbyte-airbyte-env
+          - name: ACTIVITY_INITIAL_DELAY_BETWEEN_ATTEMPTS_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVITY_INITIAL_DELAY_BETWEEN_ATTEMPTS_SECONDS
+                name: airbyte-airbyte-env
+          - name: ACTIVITY_MAX_DELAY_BETWEEN_ATTEMPTS_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: ACTIVITY_MAX_DELAY_BETWEEN_ATTEMPTS_SECONDS
+                name: airbyte-airbyte-env
+          - name: WORKFLOW_FAILURE_RESTART_DELAY_SECONDS
+            valueFrom:
+              configMapKeyRef:
+                key: WORKFLOW_FAILURE_RESTART_DELAY_SECONDS
+                name: airbyte-airbyte-env
+          - name: SHOULD_RUN_NOTIFY_WORKFLOWS
+            valueFrom:
+              configMapKeyRef:
+                key: SHOULD_RUN_NOTIFY_WORKFLOWS
+                name: airbyte-airbyte-env
+          - name: CONTROL_PLANE_TOKEN_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: CONTROL_PLANE_TOKEN_ENDPOINT
+                name: airbyte-airbyte-env
+          - name: DATAPLANE_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                key: dataplane-client-id
+                name: airbyte-auth-secrets
+          - name: DATAPLANE_CLIENT_ID_SECRET_NAME
+            value: airbyte-auth-secrets
+          - name: DATAPLANE_CLIENT_ID_SECRET_KEY
+            value: dataplane-client-id
+          - name: DATAPLANE_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: dataplane-client-secret
+                name: airbyte-auth-secrets
+          - name: DATAPLANE_CLIENT_SECRET_SECRET_NAME
+            value: airbyte-auth-secrets
+          - name: DATAPLANE_CLIENT_SECRET_SECRET_KEY
+            value: dataplane-client-secret
+          - name: MICRONAUT_ENVIRONMENTS
+            valueFrom:
+              configMapKeyRef:
+                key: LAUNCHER_MICRONAUT_ENVIRONMENTS
+                name: airbyte-airbyte-env
+          - name: WORKLOAD_LAUNCHER_PARALLELISM
+            valueFrom:
+              configMapKeyRef:
+                key: WORKLOAD_LAUNCHER_PARALLELISM
+                name: airbyte-airbyte-env
+          - name: FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT
+            valueFrom:
+              configMapKeyRef:
+                key: FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT
+                name: airbyte-airbyte-env
+          - name: FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST
+            valueFrom:
+              configMapKeyRef:
+                key: FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST
+                name: airbyte-airbyte-env
+          - name: SECRET_PERSISTENCE
+          - name: S3_PATH_STYLE_ACCESS
+            valueFrom:
+              configMapKeyRef:
+                key: S3_PATH_STYLE_ACCESS
+                name: airbyte-airbyte-env
+          - name: STORAGE_TYPE
+            value: MINIO
+          - name: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_ACTIVITY_PAYLOAD
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_LOG
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_LOG
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_STATE
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_STATE
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_WORKLOAD_OUTPUT
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_WORKLOAD_OUTPUT
+                name: airbyte-airbyte-env
+          - name: STORAGE_BUCKET_AUDIT_LOGGING
+            valueFrom:
+              configMapKeyRef:
+                key: STORAGE_BUCKET_AUDIT_LOGGING
+                name: airbyte-airbyte-env
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ACCESS_KEY_ID
+                name: airbyte-airbyte-secrets
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_SECRET_ACCESS_KEY
+                name: airbyte-airbyte-secrets
+          - name: MINIO_ENDPOINT
+            valueFrom:
+              configMapKeyRef:
+                key: MINIO_ENDPOINT
+                name: airbyte-airbyte-env
+          image: airbyte/workload-launcher:2.0.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health/liveness
+              port: heartbeat
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: airbyte-workload-launcher-container
+          ports:
+          - containerPort: 8085
+            name: heartbeat
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health/readiness
+              port: heartbeat
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        serviceAccount: airbyte-admin
+        serviceAccountName: airbyte-admin
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T21:45:00Z"
+      lastUpdateTime: "2025-12-24T21:45:00Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:43:26Z"
+      lastUpdateTime: "2025-12-24T21:45:00Z"
+      message: ReplicaSet "airbyte-workload-launcher-59b95d9569" has successfully
+        progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 5
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      helm.sh/hook: pre-install
+      helm.sh/hook-weight: "-1"
+    creationTimestamp: "2025-12-24T20:42:58Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: airbyte-db
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: airbyte-1.9.2
+    name: airbyte-db
+    namespace: airbyte
+    resourceVersion: "2444"
+    uid: 30e8a9a3-ee2c-416c-aac0-3eef8660972f
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: airbyte-db
+    serviceName: airbyte-db-svc
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: airbyte-db
+      spec:
+        containers:
+        - env:
+          - name: POSTGRES_DB
+            value: db-airbyte
+          - name: POSTGRES_PASSWORD
+            value: airbyte
+          - name: POSTGRES_USER
+            value: airbyte
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
+          image: airbyte/db:2.0.1
+          imagePullPolicy: IfNotPresent
+          name: airbyte-db-container
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 70
+            runAsNonRoot: true
+            runAsUser: 70
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /var/lib/postgresql/data
+            name: airbyte-volume-db
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 70
+        terminationGracePeriodSeconds: 30
+    updateStrategy:
+      rollingUpdate:
+        partition: 0
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        name: airbyte-volume-db
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Mi
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: airbyte-db-7cbc8ccd69
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: airbyte-db-7cbc8ccd69
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      helm.sh/hook: pre-install
+      helm.sh/hook-weight: "-1"
+    creationTimestamp: "2025-12-24T20:42:59Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: airbyte-minio
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: airbyte-1.9.2
+    name: airbyte-minio
+    namespace: airbyte
+    resourceVersion: "2431"
+    uid: 9082a17d-30a7-4cb6-9020-75e86ad22267
+  spec:
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Retain
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: airbyte
+        app.kubernetes.io/name: airbyte-minio
+    serviceName: airbyte-minio-svc
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app.kubernetes.io/instance: airbyte
+          app.kubernetes.io/name: airbyte-minio
+      spec:
+        containers:
+        - args:
+          - server
+          - /storage
+          env:
+          - name: MINIO_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_ACCESS_KEY_ID
+                name: airbyte-airbyte-secrets
+          - name: MINIO_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MINIO_SECRET_ACCESS_KEY
+                name: airbyte-airbyte-secrets
+          image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+          imagePullPolicy: IfNotPresent
+          name: airbyte-minio
+          ports:
+          - containerPort: 9000
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 300m
+              memory: 2Gi
+            requests:
+              cpu: 250m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /storage
+            name: airbyte-minio-pv-claim
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        terminationGracePeriodSeconds: 30
+    updateStrategy:
+      rollingUpdate:
+        partition: 0
+      type: RollingUpdate
+    volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        creationTimestamp: null
+        name: airbyte-minio-pv-claim
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Mi
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+  status:
+    availableReplicas: 1
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: airbyte-minio-786c886f95
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: airbyte-minio-786c886f95
+    updatedReplicas: 1
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: connector-builder-server
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: connector-builder-server-1.9.2
+    name: airbyte-airbyte-connector-builder-server-svc
+    namespace: airbyte
+    resourceVersion: "2477"
+    uid: 8dc619f2-bc03-413f-8368-98289e36c6d0
+  spec:
+    clusterIP: 10.43.229.166
+    clusterIPs:
+    - 10.43.229.166
+    externalTrafficPolicy: Cluster
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      nodePort: 30100
+      port: 80
+      protocol: TCP
+      targetPort: http
+    selector:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/name: connector-builder-server
+    sessionAffinity: None
+    type: NodePort
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: server
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: server-1.9.2
+    name: airbyte-airbyte-server-svc
+    namespace: airbyte
+    resourceVersion: "2468"
+    uid: 99044970-8340-4fc1-a69e-37766a827072
+  spec:
+    clusterIP: 10.43.121.106
+    clusterIPs:
+    - 10.43.121.106
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 8001
+      protocol: TCP
+      targetPort: http
+    selector:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/name: server
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      helm.sh/hook: pre-install
+      helm.sh/hook-weight: "-1"
+    creationTimestamp: "2025-12-24T20:42:59Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: airbyte-db
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: airbyte-1.9.2
+    name: airbyte-db-svc
+    namespace: airbyte
+    resourceVersion: "2354"
+    uid: 0f21780a-1287-40dc-8b29-a0a98878ee2f
+  spec:
+    clusterIP: 10.43.92.207
+    clusterIPs:
+    - 10.43.92.207
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - port: 5432
+      protocol: TCP
+      targetPort: 5432
+    selector:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/name: airbyte-db
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      helm.sh/hook: pre-install
+      helm.sh/hook-weight: "-1"
+    creationTimestamp: "2025-12-24T20:42:59Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: airbyte-minio
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: airbyte-1.9.2
+    name: airbyte-minio-svc
+    namespace: airbyte
+    resourceVersion: "2379"
+    uid: 757a0722-7d21-4f88-a774-8ab92f482892
+  spec:
+    clusterIP: 10.43.203.139
+    clusterIPs:
+    - 10.43.203.139
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - port: 9000
+      protocol: TCP
+      targetPort: 9000
+    selector:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/name: airbyte-minio
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: temporal
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: temporal-1.9.2
+    name: airbyte-temporal
+    namespace: airbyte
+    resourceVersion: "2469"
+    uid: 88e75045-d123-4871-8f86-735143259cff
+  spec:
+    clusterIP: 10.43.96.72
+    clusterIPs:
+    - 10.43.96.72
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - port: 7233
+      protocol: TCP
+      targetPort: 7233
+    selector:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/name: temporal
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: workload-api-server
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: workload-api-server-1.9.2
+    name: airbyte-workload-api-server-svc
+    namespace: airbyte
+    resourceVersion: "2461"
+    uid: 4afab556-a3cc-4fd4-8fc5-d159f253af05
+  spec:
+    clusterIP: 10.43.66.229
+    clusterIPs:
+    - 10.43.66.229
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 8007
+      protocol: TCP
+      targetPort: http
+    selector:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/name: workload-api-server
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  data:
+    ACTIVITY_INITIAL_DELAY_BETWEEN_ATTEMPTS_SECONDS: ""
+    ACTIVITY_MAX_ATTEMPT: ""
+    ACTIVITY_MAX_DELAY_BETWEEN_ATTEMPTS_SECONDS: ""
+    AIRBYTE_API_HOST: http://localhost:8001/api/public
+    AIRBYTE_EDITION: community
+    AIRBYTE_SERVER_HOST: airbyte-airbyte-server-svc:8001
+    AIRBYTE_URL: http://localhost:8080
+    AIRBYTE_VERSION: 2.0.1
+    API_URL: /api/v1/
+    CONFIG_API_HOST: http://airbyte-airbyte-server-svc:8001
+    CONFIG_ROOT: /configs
+    CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.35.15.001
+    CONNECTOR_BUILDER_API_HOST: airbyte-airbyte-connector-builder-server-svc:80
+    CONNECTOR_BUILDER_SERVER_API_HOST: http://airbyte-airbyte-connector-builder-server-svc:80
+    CONNECTOR_PROFILER_IMAGE: airbyte/async-profiler:2.0.1
+    CONNECTOR_REGISTRY_SEED_PROVIDER: remote
+    CONNECTOR_SIDECAR_IMAGE: airbyte/connector-sidecar:2.0.1
+    CONTAINER_ORCHESTRATOR_IMAGE: airbyte/container-orchestrator:2.0.1
+    CONTROL_PLANE_TOKEN_ENDPOINT: http://airbyte-airbyte-server-svc:8001/api/v1/dataplanes/token
+    CRON_MICRONAUT_ENVIRONMENTS: control-plane
+    DATA_DOCKER_MOUNT: airbyte_data
+    DATABASE_DB: db-airbyte
+    DATABASE_HOST: airbyte-db-svc
+    DATABASE_PORT: "5432"
+    DATABASE_URL: jdbc:postgresql://airbyte-db-svc:5432/db-airbyte
+    DB_DOCKER_MOUNT: airbyte_db
+    ENTERPRISE_SOURCE_STUBS_URL: https://connectors.airbyte.com/files/resources/connector_stubs/v1/connector_stubs.json
+    FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT: 5G
+    FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST: 5G
+    GOOGLE_APPLICATION_CREDENTIALS: /secrets/gcs-log-creds/gcp.json
+    INTERNAL_API_HOST: http://airbyte-airbyte-server-svc:8001
+    JOB_KUBE_CONNECTOR_IMAGE_REGISTRY: ""
+    JOB_KUBE_LOCAL_VOLUME_ENABLED: "false"
+    JOB_KUBE_MAIN_CONTAINER_IMAGE_PULL_SECRET: ""
+    JOB_MAIN_CONTAINER_CPU_LIMIT: ""
+    JOB_MAIN_CONTAINER_CPU_REQUEST: ""
+    JOB_MAIN_CONTAINER_MEMORY_LIMIT: ""
+    JOB_MAIN_CONTAINER_MEMORY_REQUEST: ""
+    JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.29.15.001
+    KEYCLOAK_DATABASE_URL: jdbc:postgresql://airbyte-db-svc:5432/db-airbyte?currentSchema=keycloak
+    KEYCLOAK_INTERNAL_HOST: localhost
+    KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS: ""
+    LAUNCHER_MICRONAUT_ENVIRONMENTS: control-plane,oss
+    LOG_LEVEL: INFO
+    MANIFEST_SERVER_API_HOST: http://airbyte-airbyte-unused-svc:80
+    MAX_NOTIFY_WORKERS: "5"
+    MICROMETER_METRICS_ENABLED: "false"
+    MICROMETER_METRICS_OTLP_ENABLED: "false"
+    MICROMETER_METRICS_STATSD_ENABLED: "false"
+    MICROMETER_METRICS_STATSD_FLAVOR: datadog
+    MICROMETER_METRICS_STEP: PT1M
+    MINIO_ENDPOINT: http://airbyte-minio-svc:9000
+    OTEL_COLLECTOR_ENDPOINT: ""
+    PUB_SUB_ENABLED: "false"
+    PUB_SUB_TOPIC_NAME: ""
+    RUN_DATABASE_MIGRATION_ON_STARTUP: "true"
+    S3_PATH_STYLE_ACCESS: "true"
+    SEGMENT_WRITE_KEY: 7UDdp5K55CyiGgsauOr2pNNujGvmhaeu
+    SERVER_MICRONAUT_ENVIRONMENTS: control-plane
+    SHOULD_RUN_NOTIFY_WORKFLOWS: "true"
+    STATSD_HOST: localhost
+    STATSD_PORT: "8125"
+    STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-storage
+    STORAGE_BUCKET_AUDIT_LOGGING: airbyte-storage
+    STORAGE_BUCKET_LOG: airbyte-storage
+    STORAGE_BUCKET_STATE: airbyte-storage
+    STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-storage
+    STORAGE_TYPE: minio
+    TEMPORAL_HOST: airbyte-temporal:7233
+    TEMPORAL_WORKER_PORTS: 9001,9002,9003,9004,9005,9006,9007,9008,9009,9010,9011,9012,9013,9014,9015,9016,9017,9018,9019,9020,9021,9022,9023,9024,9025,9026,9027,9028,9029,9030,9031,9032,9033,9034,9035,9036,9037,9038,9039,9040
+    TRACKING_STRATEGY: segment
+    UPDATE_DEFINITIONS_CRON_ENABLED: "true"
+    WEBAPP_URL: http://airbyte-airbyte-webapp-svc:80
+    WORKER_ENVIRONMENT: kubernetes
+    WORKERS_MICRONAUT_ENVIRONMENTS: control-plane
+    WORKFLOW_FAILURE_RESTART_DELAY_SECONDS: ""
+    WORKLOAD_API_HOST: http://airbyte-workload-api-server-svc:8007
+    WORKLOAD_INIT_IMAGE: airbyte/workload-init-container:2.0.1
+    WORKLOAD_LAUNCHER_PARALLELISM: "10"
+    WORKSPACE_DOCKER_MOUNT: airbyte_workspace
+    WORKSPACE_ROOT: /workspace
+  kind: ConfigMap
+  metadata:
+    annotations:
+      helm.sh/hook: pre-install,pre-upgrade
+      helm.sh/hook-weight: "-1"
+    creationTimestamp: "2025-12-24T23:02:59Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: airbyte
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: airbyte-1.9.2
+    name: airbyte-airbyte-env
+    namespace: airbyte
+    resourceVersion: "11030"
+    uid: 54d12635-0273-45e2-87ea-f7975874fbaa
+- apiVersion: v1
+  data:
+    S3_BUCKET_LOG: airbyte-logs
+    S3_BUCKET_NAME: airbyte
+    S3_BUCKET_STATE: airbyte-state
+    S3_ENDPOINT: http://openkpi-minio.open-kpi.svc.cluster.local:9000
+    S3_PATH_STYLE_ACCESS: "true"
+    S3_REGION: us-east-1
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","data":{"S3_BUCKET_LOG":"airbyte-logs","S3_BUCKET_NAME":"airbyte","S3_BUCKET_STATE":"airbyte-state","S3_ENDPOINT":"http://openkpi-minio.open-kpi.svc.cluster.local:9000","S3_PATH_STYLE_ACCESS":"true","S3_REGION":"us-east-1"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"airbyte-s3-config","namespace":"airbyte"}}
+    creationTimestamp: "2025-12-24T20:58:22Z"
+    name: airbyte-s3-config
+    namespace: airbyte
+    resourceVersion: "3612"
+    uid: f026288d-8af7-4b20-b96d-09950dd7bcea
+- apiVersion: v1
+  data:
+    development.yaml: |
+      frontend.namespaceCount:
+        - value: 4096
+          constraints: {}
+      frontend.namespaceRPS.visibility:
+        - value: 100
+          constraints: {}
+      frontend.namespaceBurst.visibility:
+        - value: 150
+          constraints: {}
+      frontend.namespaceRPS:
+        - value: 76800
+          constraints: {}
+      frontend.enableClientVersionCheck:
+        - value: true
+          constraints: {}
+      history.persistenceMaxQPS:
+        - value: 3000
+          constraints: {}
+      frontend.persistenceMaxQPS:
+        - value: 5000
+          constraints: {}
+      frontend.historyMgrNumConns:
+        - value: 30
+          constraints: {}
+      frontend.throttledLogRPS:
+        - value: 200
+          constraints: {}
+      frontend.enableUpdateWorkflowExecution:
+        - value: true
+      frontend.enableUpdateWorkflowExecutionAsyncAccepted:
+        - value: true
+      history.historyMgrNumConns:
+        - value: 50
+          constraints: {}
+      system.advancedVisibilityWritingMode:
+        - value: "off"
+          constraints: {}
+      history.defaultActivityRetryPolicy:
+        - value:
+            InitialIntervalInSeconds: 1
+            MaximumIntervalCoefficient: 100.0
+            BackoffCoefficient: 2.0
+            MaximumAttempts: 0
+      history.defaultWorkflowRetryPolicy:
+        - value:
+            InitialIntervalInSeconds: 1
+            MaximumIntervalCoefficient: 100.0
+            BackoffCoefficient: 2.0
+            MaximumAttempts: 0
+      # Limit for responses. This mostly impacts discovery jobs since they have the largest responses.
+      limit.blobSize.error:
+        - value: 15728640 # 15MB
+          constraints: {}
+      limit.blobSize.warn:
+        - value: 10485760 # 10MB
+          constraints: {}
+  kind: ConfigMap
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: airbyte
+      meta.helm.sh/release-namespace: airbyte
+    creationTimestamp: "2025-12-24T20:43:26Z"
+    labels:
+      app.kubernetes.io/instance: airbyte
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: temporal
+      app.kubernetes.io/version: 2.0.1
+      helm.sh/chart: temporal-1.9.2
+    name: airbyte-temporal-dynamicconfig
+    namespace: airbyte
+    resourceVersion: "2457"
+    uid: 2da87646-9a63-4a6b-a3ed-b7b9cfa07864
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+      dmVyLWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAATnFiU7bBSGw1xnMhMzKu8k+B3pMR+L92SW7nRee1ix
+      lnGEK8372uuBcF8zzrJGnyyma4jMlNPjE6wgZuPi6xMlo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK0kEelYwOY3kgq3QQ8bP
+      NVTy4HEwCgYIKoZIzj0EAwIDSQAwRgIhAMGD2PiWLWEmqssuAOFSqbIZ5w1mpVav
+      Dg26sRLLcrgqAiEAuToBfY7Yafg5C018WzHmZhts9/07vJegDAfzl0AXUgA=
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2025-12-24T20:19:25Z"
+    name: kube-root-ca.crt
+    namespace: airbyte
+    resourceVersion: "443"
+    uid: 01106902-a452-4e61-88c6-b991bca752f8
+kind: List
+metadata:
+  resourceVersion: ""

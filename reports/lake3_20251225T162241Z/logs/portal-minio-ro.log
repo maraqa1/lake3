@@ -1,0 +1,1 @@
+Error from server (BadRequest): container "mc" in pod "portal-minio-ro-v6qvt" is waiting to start: trying and failing to pull image

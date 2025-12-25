@@ -1,0 +1,649 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/6xV3XLbOA99lW9wLcVW3DauZr6Lbpzddtp6PXXSm06mQ1OQxTVFcEnIiTbjd9+BZDt2m592p1e2SAA8ODgA7kB58xlDNOQgB+V9HKwzSGBlXAE5TNBbamt0DAnUyKpQrCC/A+UcsWJDLsonLf5CzRH5JBg60YrZ4omhgZEgkDx6TzcOQ7pcryCH1Sge3Kyz5H/vjSv+/6YoyD0bwqkaIQdNAQsXf8g8eqXFZ9UsMI1tZKxhk4BVC7RdUqtxTJX3O5M+rvwNDhmjRNs+e04BJ9P5E89WKlaQw0Lj6Xh0+no8zrKzFyM1HI1fqcXLbFielq/OsDx7cfpiqF+eCZDvUnoCdPSoBXLAtZFavjWRKbQfTG0Y8mECES1qpiBGtWJdfXgqzY2E5KAYl20Xlqw1bnnlC8XYh7i9cmqtjFULi5BnmwS49YLs05GtnGPt7c7vQEJPEr05SEqTY2Uchgj5lztQYSl/INXkSkhggKwHW5YGUonSWITrBEytloIoKKcrDIPahCBm6dZ495tnJ9noRFTfecwaa2dkjW4hh3fllHgWMPYtYM0aHcY4C7ToEiqVsU3AyypgrMgWkI8SqJj9H8hy7xVL3QcVKssVJOApMOTj4ViKoivsavz28nImVBln2Cg7QavaOWpyRYT81TABj8FQsT/KxLnRGmM8eDlLgE2N1PC94UM6Egg9lXtmZx2ql6O99dYyEJMmCzlcTQThMy4pa3/sdnn+oNvr7MCxRg5GxwccrxMIqArznygXz/ae8Wyc/Sjj3xN++hN8B4zUBI2dtK10YOylX1MQSWVnw48GOsO/G4z9rfaNXA2HdTdot6a9pbQC6iYYbs/JMd52aSpr6WYWzNpYXOJF1Mp28xjyUtmICWjl1cJYw6aHoopC2mZ6cfn1t3fTydf5xafP784vpFOKQF7ulLVwvelJ/9PZ9hMR/24sbgdNzqHBTQJrsk2NH6lxWx3V8ne25f2gHeFAfa40y7T3hPsXdjEfjzHQTWSqD0J13+kzEa9FPIWL+06eYKkaK03sqMD5wTw8HukUIQdrXHMrNfLBUEe8VTFOewA9G6m2TWQMqQ6GjVYWpExhbTS+0VqSmX7beEwWw25pfrmDFQqw861/t+hil0IC5MVS8MHFrRGRCEdYlqgZcpjSXFdYNFYy78NIVmkgiyfH+UjnBbKpt8rhL41cK8n/4ZDXkq0nS8t27qU05+Rko5idZLrpP//prVSr2/kKb/rm2z7wvkN5jK2iyJ1eErip0F25qNjE0vTrCiY0Jd4nKgT8cjy7r29I+4fcY6B2eN649ka1HYe9uvfDujTLj8oLHMNYH4lot/eS3fzbn0h2vdGUCnxLUp+91f2RPPfNqtg80r7bgX6P5tgv3XcseRG7svvJ8VQLb643m83m3wAAAP//gh7fNZIKAAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: coredns
+      objectset.rio.cattle.io/owner-namespace: kube-system
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    generation: 1
+    labels:
+      k8s-app: kube-dns
+      kubernetes.io/name: CoreDNS
+      objectset.rio.cattle.io/hash: bce283298811743a0386ab510f2f67ef74240c57
+    name: coredns
+    namespace: kube-system
+    resourceVersion: "562"
+    uid: 0312f936-9163-4490-b3bb-514680583008
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 0
+    selector:
+      matchLabels:
+        k8s-app: kube-dns
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          k8s-app: kube-dns
+      spec:
+        containers:
+        - args:
+          - -conf
+          - /etc/coredns/Corefile
+          image: rancher/mirrored-coredns-coredns:1.13.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: coredns
+          ports:
+          - containerPort: 53
+            name: dns
+            protocol: UDP
+          - containerPort: 53
+            name: dns-tcp
+            protocol: TCP
+          - containerPort: 9153
+            name: metrics
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /ready
+              port: 8181
+              scheme: HTTP
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: 170Mi
+            requests:
+              cpu: 100m
+              memory: 70Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add:
+              - NET_BIND_SERVICE
+              drop:
+              - all
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/coredns
+            name: config-volume
+            readOnly: true
+          - mountPath: /etc/coredns/custom
+            name: custom-config-volume
+            readOnly: true
+        dnsPolicy: Default
+        nodeSelector:
+          kubernetes.io/os: linux
+        priorityClassName: system-cluster-critical
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: coredns
+        serviceAccountName: coredns
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        topologySpreadConstraints:
+        - labelSelector:
+            matchLabels:
+              k8s-app: kube-dns
+          maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+        - labelSelector:
+            matchLabels:
+              k8s-app: kube-dns
+          maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: Corefile
+              path: Corefile
+            - key: NodeHosts
+              path: NodeHosts
+            name: coredns
+          name: config-volume
+        - configMap:
+            defaultMode: 420
+            name: coredns-custom
+            optional: true
+          name: custom-config-volume
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:19:26Z"
+      lastUpdateTime: "2025-12-24T20:19:26Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:19:26Z"
+      lastUpdateTime: "2025-12-24T20:19:33Z"
+      message: ReplicaSet "coredns-6d668d687" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/6xU4U/7NhD9V6b7nKTtr1BVkfahAqZNg1KB2BdUTVfn0po6tmVfM6Iq//t0TQpFo7BJ+5Q4vnt5796z94Be/0EhamchB/Q+DuoRJLDVtoAcrskb11RkGRKoiLFARsj3gNY6RtbORlm61QspjsRZ0C5TyGwo026gBQSSs/vuL0shXddbyGE7jic79Sj56Xdti59nReHstxAWK4IcjFNo0sgu4Jr+VVP0qKRzu1tRGpvIVEGbgMEVmS+lbTBuIIfRdFyOL9XksixXajycXEyG4/JiXI4up8NiqiZT/FHgqrgQ0A8kPfIm9cHVWoZPAbr9M3yiJyVsAnX1v2oR2dzqSjPkwwQiGVLsghRVyGpz+6YAvT//11bAOSDTujn8wBmj7frJF8jUgb0+WaxRG1wZgnzUJsCNF44PH2rlO1XeHPtO0mL+A5deqHKWUVsKEfJnWVYVSiSfz48vMgbJaZoqZ0u9hgQGxGrQrfpH9hKdhWUCZOsDcm/K4v76z/ns7uZxMbu6gQRqNDv6JbhKyJSaTPFA5dv7AlnMP2rM3p1r23aZgK4kfzkEtGpDYfA557weZsNs/AP6hsXOmIUzWjWQw2/l3PEiUOwO33fZqZ3ZVXTndpa7iVXy2vM8HcM7Vvch7TqhXQpx6wp6PImSxDBYYoqHYxOFgra7V3HbB+2C5ubKYIzzDrNLbCowqQqatUIj1lCotaKZUsJq/pWWtK9NsSuGBNgZCsfL5nkPW5IBXfXwhwsi3lvTyIH3Uinc4eZVR47QJnugsiTFkMPcPaoNFTsjl0MHc6AanKHso1YJYHAm9QYt/a/IFUY+ePYJ5PLo5DH2YtEdevHinxHoc96et7Rt278DAAD//8uQvPTkBQAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: local-storage
+      objectset.rio.cattle.io/owner-namespace: kube-system
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    generation: 1
+    labels:
+      objectset.rio.cattle.io/hash: 183f35c65ffbc3064603f43f1580d8c68a2dabd4
+    name: local-path-provisioner
+    namespace: kube-system
+    resourceVersion: "654"
+    uid: 27f0dc03-2387-45ce-bc88-b98ce8469331
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 0
+    selector:
+      matchLabels:
+        app: local-path-provisioner
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: local-path-provisioner
+      spec:
+        containers:
+        - command:
+          - local-path-provisioner
+          - start
+          - --config
+          - /etc/config/config.json
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          image: rancher/local-path-provisioner:v0.0.32
+          imagePullPolicy: IfNotPresent
+          name: local-path-provisioner
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/config/
+            name: config-volume
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/os: linux
+        priorityClassName: system-node-critical
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: local-path-provisioner-service-account
+        serviceAccountName: local-path-provisioner-service-account
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        volumes:
+        - configMap:
+            defaultMode: 420
+            name: local-path-config
+          name: config-volume
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:19:26Z"
+      lastUpdateTime: "2025-12-24T20:19:26Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:19:26Z"
+      lastUpdateTime: "2025-12-24T20:19:34Z"
+      message: ReplicaSet "local-path-provisioner-869c44bfbd" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "1"
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/6xV4W8auRP9V36az7vJLoEkXYkPiPAr1aUpKvROpypCxjuAD6/t88zScBH/+2l2k5RcStOr7gta7PHzm/fGM/eggvkVIxnvoAAVAp1uc0hgY1wJBVxhsH5XoWNIoEJWpWIFxT0o5zwrNt6R/PWLP1AzIZ9E40+0YrZ4YvypERBIju77Lw5jutpuoIDNGR3sbPPkf78YV/YHZendqxBOVQiFUIxGU0oYtxjT8pD+6wAUlBaUTb3AlHbEWME+AasWaJs0N5eUqhBeXPQd9LWiNRSAeYadbg/zM+yeq4tOT78py7LsLt/gonP2Zpl3Ly4uustS7vtmLtCuH6FIAbUQjLg14uXYEPu4uzaVYSiyBAgtavZRgirFen39elJ7AeaoGFe7Btxba9zqUygVYwt098mprTJWLSxCke8T4F0Qfh+fxco6VsE+njsopB8Q96gkB4lr71gZh5Gg+HwPKq7kA9JUY+S0NLF/ylWABNKUUNcR0+Aj9/Os08uaVRHUIqch4hJjxDJVZRmRKJWMqP/OMUan7LtJMrp7+hx74obbIURNmDpfYkqsuKbmpiagpZ9GJG9reTv9vEfNDltKtQlrjCnVhpH6s+vpfDS8Go/kdzqY//ZuNp4PRtN5p3c+fzt8P5+OB2eX3eRr3McfivoHWt65fIzr9M6PoR2NOkAbjgfD8aCTzScfrn/Pz7Let8BeBMFtAqZSK3E3KqfXGE8rE6MXB57bXWyzk8sTccuaLTokmkS/aApqqYytI87WEWntbQnFWQJr5vAWWfaDYnmEp3LwL0igcaRoIkR/0mts6ms8m02mUlbGGTbKXqFVuylq70qC4jxLIGA0vnxayuVp1Voj0cHleQJsKvQ1fw38zrsWNm3ZPlXxpCHYVOfTuUe2IXr22lsoYDacwP42gYiqND+liJzc/bwkLxXp/AtB5CHUUSO1revPGombbx1qKCDPsqoZO5WPOyjgIntv2qYkL9jwbugd412Tj7LWf5lEszUWVzgirWwznaBYKkvYSvTB2d1H7/n/xuJD7yw41rJbuwHdeCe7z9Y+EUYxIsv2CWy9rSt872v34Fcln5MHKdv+8mAWV0G6DuxvxR/pBtODDiydIjpkpGYAERRgjavvROcQjW+Ss4ropkVrybZNRUfDRisrJmHcGo0DrYXHzZHyYm8xPo7qz/ewQRFz+ADTjFcSZWSIBYkUjjC6M2LGPrkHXC5RS3Hc+KleY1lb6XctTEMpeosnz3OSSo7epsEqh/8pcqWI24n7EvL20aM2U6wC766MSL7/ljP7/f7vAAAA//93ZXtQAQkAAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: metrics-server-deployment
+      objectset.rio.cattle.io/owner-namespace: kube-system
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    generation: 1
+    labels:
+      k8s-app: metrics-server
+      objectset.rio.cattle.io/hash: e10e245e13e46a725c9dddd4f9eb239f147774fd
+    name: metrics-server
+    namespace: kube-system
+    resourceVersion: "859"
+    uid: b3f27443-d3e3-4631-8331-e92e81bf8f35
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 0
+    selector:
+      matchLabels:
+        k8s-app: metrics-server
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 1
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          k8s-app: metrics-server
+        name: metrics-server
+      spec:
+        containers:
+        - args:
+          - --cert-dir=/tmp
+          - --secure-port=10250
+          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+          - --kubelet-use-node-status-port
+          - --metric-resolution=15s
+          - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+          image: rancher/mirrored-metrics-server:v0.8.0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /livez
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: metrics-server
+          ports:
+          - containerPort: 10250
+            name: https
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /readyz
+              port: https
+              scheme: HTTPS
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 70Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: tmp-dir
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/os: linux
+        priorityClassName: system-node-critical
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: metrics-server
+        serviceAccountName: metrics-server
+        terminationGracePeriodSeconds: 30
+        tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        volumes:
+        - emptyDir: {}
+          name: tmp-dir
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-24T20:19:26Z"
+      lastUpdateTime: "2025-12-24T20:19:26Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-24T20:19:26Z"
+      lastUpdateTime: "2025-12-24T20:19:52Z"
+      message: ReplicaSet "metrics-server-7bfffcd44" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/4ySQYvbMBCF/0p5Z9m142TjFfRQdimUQgmk7aXsQZYnG9W2JKRJSgj+70WJl00b0vZm8958vHmjI5Q33yhE4ywk9iUEOmNbSKwp7I0mCAzEqlWsII9Q1jpWbJyN6dc1P0hzJM6DcblWzD3lxr01iQBxU3c/LYXsed9BoqvihbIvxZtPxrbv3rets/9EWDUQJLQL1Nr4X/bolU4z3a6hLB4i0wABH9xAvKVdTG7vAkPivlxUV1rUQfkE4LAjjAK9aqg/1dHVMVPev8DPidJnsMR0mtb9LjKFLE71Tpg/bdNeDy7Q4+f1X/baqriFRKNpVlez+7ouy+W8UkVV36lmURab2eZuSZvlfDYv9GKZ8k7si4i3ahkFoiedVptyf1xBoizyeZUXeVlAvAoR8vul9CRg/Ac1mP6wcr3Rh/SojH3uac1Kd6lXFzhNHV8indOcy19Up+LZaddD4uvjCqO4dGas/S33l4ff3ANxMPqVne567X8SiNSTZhduHHMcx18BAAD//5X9LCMyAwAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: coredns
+      objectset.rio.cattle.io/owner-namespace: kube-system
+      prometheus.io/port: "9153"
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    labels:
+      k8s-app: kube-dns
+      kubernetes.io/cluster-service: "true"
+      kubernetes.io/name: CoreDNS
+      objectset.rio.cattle.io/hash: bce283298811743a0386ab510f2f67ef74240c57
+    name: kube-dns
+    namespace: kube-system
+    resourceVersion: "282"
+    uid: 4593e6c0-3907-4d93-abbf-2ce9b7995737
+  spec:
+    clusterIP: 10.43.0.10
+    clusterIPs:
+    - 10.43.0.10
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: dns
+      port: 53
+      protocol: UDP
+      targetPort: 53
+    - name: dns-tcp
+      port: 53
+      protocol: TCP
+      targetPort: 53
+    - name: metrics
+      port: 9153
+      protocol: TCP
+      targetPort: 9153
+    selector:
+      k8s-app: kube-dns
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/4SQQWsbMRCF/0p5Z9nNep04FfRQWnopBUNKL6WHWe04VleWhGa8xZj970UbFxLaJCchvZn3vqczKPvvXMSnCIuxgcHgYw+LOy6jdwyDAyv1pAR7BsWYlNSnKPWaul/sVFiXxaelI9XAS5/e+uoA86yefkcui/txgMXQyiNlbMybLz727z/0fYqvWkQ6MGxFLN7JQriMXObjgf31bcnkqsVw7HghJ1E+YDII1HGYO1ahRFaWuujCUfRRhIWWY016Onbh+vqE6wWePckeFnTdt527uWrc7abhZtXuqF11q83uev2uu2HabK46t1tTJfxvdTy8P1NKMrtayefPdPDhtE3BuxMstoV3XD4dKdwpuQEGORUV2B/nvzl71SwXAXa9bg1ySZpcCrD49nELA6Vyz7qdJy4L008D4cBOU5l/81YWlPO/4NM0/QkAAP//sKxN444CAAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: metrics-server-service
+      objectset.rio.cattle.io/owner-namespace: kube-system
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    labels:
+      kubernetes.io/cluster-service: "true"
+      kubernetes.io/name: Metrics-server
+      objectset.rio.cattle.io/hash: a5d3bc601c871e123fa32b27f549b6ea770bcf4a
+    name: metrics-server
+    namespace: kube-system
+    resourceVersion: "329"
+    uid: 0ec21abd-713e-43b2-b88e-d01399f6973f
+  spec:
+    clusterIP: 10.43.33.117
+    clusterIPs:
+    - 10.43.33.117
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: PreferDualStack
+    ports:
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: https
+    selector:
+      k8s-app: metrics-server
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  data:
+    clusterDNS: 10.43.0.10
+    clusterDomain: cluster.local
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: "2025-12-24T20:19:21Z"
+    name: cluster-dns
+    namespace: kube-system
+    resourceVersion: "246"
+    uid: ba117628-2967-4041-be47-c15bc34f6cfe
+- apiVersion: v1
+  data:
+    Corefile: |
+      .:53 {
+          errors
+          health
+          ready
+          kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            fallthrough in-addr.arpa ip6.arpa
+          }
+          hosts /etc/coredns/NodeHosts {
+            ttl 60
+            reload 15s
+            fallthrough
+          }
+          prometheus :9153
+          cache 30
+          loop
+          reload
+          loadbalance
+          import /etc/coredns/custom/*.override
+          forward . /etc/resolv.conf
+      }
+      import /etc/coredns/custom/*.server
+    NodeHosts: |
+      37.27.4.125 datalake-srv3 DataLake-Srv3
+  kind: ConfigMap
+  metadata:
+    annotations:
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/4yQwWrzMBCEX0Xs2fEf20nsX9BDybH02lMva2kdq1Z2g6SkBJN3L8IUCiVtbyNGOzvfzoAn90IhOmHQcKmgAIsJQc+wl0CD8wQaSr1t1PzKSilFIUiIix4JfRoXHQjtdZHTuafAlCgq488xUSi9wK2AybEFDXvhwR2e8QQFHCnh50ZkloTJCcf8lP6NTIqUyuCkNJiSp9LJP5czoLjryztTWB0uE2iYmvjFuVSFenJsHx6tFf41gvGY6Y0Eshz/9D2e0OSZfIJVvMZExwzusSf/I9SIcQQNvaG6a+r/XVdV7abBddPtsN9W66Eedi0N7aberM22zaHf6t0tcPsIAAD//8Ix+PfoAQAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: coredns
+      objectset.rio.cattle.io/owner-namespace: kube-system
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    labels:
+      objectset.rio.cattle.io/hash: bce283298811743a0386ab510f2f67ef74240c57
+    name: coredns
+    namespace: kube-system
+    resourceVersion: "441"
+    uid: f026ef2b-48c1-46e9-b464-0c55600e0783
+- apiVersion: v1
+  data:
+    client-ca-file: |
+      -----BEGIN CERTIFICATE-----
+      MIIBdjCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3MtY2xp
+      ZW50LWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3MtY2xpZW50LWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAAR+yKoKRATyrWZ3kmRmfiTAMYp1+4sMzGbvvtQodXKY
+      QD2AZl+iMe4RLhgIh+JMPdG4EbrBrxssy7throtT9gTuo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUGNkmNWICdltIn8OhdZtI
+      GVcB8/owCgYIKoZIzj0EAwIDRwAwRAIgIKyu9RmTw1Rx//QyV63RCjZM/vRSV8WY
+      zdDZzSnT1o0CIFJFyJwVybx5xOwCjMWdnEHvggKh3j2x1gOFvMaQ0mPe
+      -----END CERTIFICATE-----
+    requestheader-allowed-names: '["system:auth-proxy"]'
+    requestheader-client-ca-file: |
+      -----BEGIN CERTIFICATE-----
+      MIIBhjCCAS2gAwIBAgIBADAKBggqhkjOPQQDAjArMSkwJwYDVQQDDCBrM3MtcmVx
+      dWVzdC1oZWFkZXItY2FAMTc2NjYwNzU1NDAeFw0yNTEyMjQyMDE5MTRaFw0zNTEy
+      MjIyMDE5MTRaMCsxKTAnBgNVBAMMIGszcy1yZXF1ZXN0LWhlYWRlci1jYUAxNzY2
+      NjA3NTU0MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0GI7D1KYSkdQf/tGu5Z/
+      HKkdbYiu7NuHLjj+3DOe0qeV44pfiQNYRuVbECIcF2XpZKdtBXxsusFUfdCUJA9T
+      iKNCMEAwDgYDVR0PAQH/BAQDAgKkMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYE
+      FEXnqYEkJuuiTAsnWaNIyZO9DHswMAoGCCqGSM49BAMCA0cAMEQCIB3XcYRgc9J4
+      c4JrToW1il5/CvU+/yq/G6IxnuXZHHRNAiB319ouokaDcFxxdKt0YDYmEXlRvdip
+      CZrGuCtCwT+gsA==
+      -----END CERTIFICATE-----
+    requestheader-extra-headers-prefix: '["X-Remote-Extra-"]'
+    requestheader-group-headers: '["X-Remote-Group"]'
+    requestheader-username-headers: '["X-Remote-User"]'
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: "2025-12-24T20:19:17Z"
+    name: extension-apiserver-authentication
+    namespace: kube-system
+    resourceVersion: "37"
+    uid: d1ae0e1e-4647-4d7a-9370-531f4f9cb7b5
+- apiVersion: v1
+  data:
+    since: "2025-12-24"
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: "2025-12-24T20:19:17Z"
+    name: kube-apiserver-legacy-service-account-token-tracking
+    namespace: kube-system
+    resourceVersion: "46"
+    uid: 531ebee6-433e-41bd-81a3-190c29b3b52a
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+      dmVyLWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAATnFiU7bBSGw1xnMhMzKu8k+B3pMR+L92SW7nRee1ix
+      lnGEK8372uuBcF8zzrJGnyyma4jMlNPjE6wgZuPi6xMlo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK0kEelYwOY3kgq3QQ8bP
+      NVTy4HEwCgYIKoZIzj0EAwIDSQAwRgIhAMGD2PiWLWEmqssuAOFSqbIZ5w1mpVav
+      Dg26sRLLcrgqAiEAuToBfY7Yafg5C018WzHmZhts9/07vJegDAfzl0AXUgA=
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2025-12-24T20:19:25Z"
+    name: kube-root-ca.crt
+    namespace: kube-system
+    resourceVersion: "449"
+    uid: eb6e1bf7-dd36-4f43-bcaf-ea516c36eba7
+- apiVersion: v1
+  data:
+    config.json: |-
+      {
+        "nodePathMap":[
+        {
+          "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",
+          "paths":["/var/lib/rancher/k3s/storage"]
+        }
+        ]
+      }
+    helperPod.yaml: |-
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: helper-pod
+      spec:
+        containers:
+        - name: helper-pod
+          image: "rancher/mirrored-library-busybox:1.36.1"
+          imagePullPolicy: IfNotPresent
+    setup: |-
+      #!/bin/sh
+      set -eu
+      mkdir -m 0777 -p "${VOL_DIR}"
+      chmod 700 "${VOL_DIR}/.."
+    teardown: |-
+      #!/bin/sh
+      set -eu
+      rm -rf "${VOL_DIR}"
+  kind: ConfigMap
+  metadata:
+    annotations:
+      objectset.rio.cattle.io/applied: H4sIAAAAAAAA/4ySX2vbMBTFv4p2t0c7deb8Q7CHsLSsLG1Cl/VlAnMtybFq+0pYSkoJ+e5DCYFurNsepR/n6JyDDoDOPOreG0vAYT+EBBQGBH4Aaaky28GTP6GDIMYEkFV6jaG+QyeA/4iXJ3JhAriAxfXN/PtyU6znmy/FzeqhuF/dF8vbb5vrRQEJ1Lp1ul9bNXjBrgX+KgNn+6GgxpDibG2VoE4HjIF4fISw05yd5amL2DstT0haSMDrsHPA4f27q9LQla8FeR1YqneCukaZnqUdy6bTKUsdE/Dh8LhaFovbh6MAQbLurGLTLLsQSCBo7JV9pjc8+46lffWbExwTiAWAw+fTgnfoIIFLkbgsEtmAwVjy8WjLJy2D12HQGzuQGEKrB8ZemegByZvcPpPu0+2+AQ5N7l+R/TBhXw2pT3OlLP3TIu4KHForsU19sD1u9X+JvEMZlc2u1Kl/8UF3sX6LpW7/Wq1GXwOH4Syv8rGcjKuqlHk2GU2yvBrl1XA8y9RMTmb4UWGpRtH0l5AOQ52ePyic0R+jHH8GAAD//7kWEdfgAgAA
+      objectset.rio.cattle.io/id: ""
+      objectset.rio.cattle.io/owner-gvk: k3s.cattle.io/v1, Kind=Addon
+      objectset.rio.cattle.io/owner-name: local-storage
+      objectset.rio.cattle.io/owner-namespace: kube-system
+    creationTimestamp: "2025-12-24T20:19:23Z"
+    labels:
+      objectset.rio.cattle.io/hash: 183f35c65ffbc3064603f43f1580d8c68a2dabd4
+    name: local-path-config
+    namespace: kube-system
+    resourceVersion: "294"
+    uid: c75b345f-d6cb-4c77-8009-6f40c6923071
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,29 @@
+NAME                               CLASS   HOSTS                           ADDRESS       PORTS     AGE
+ingress.networking.k8s.io/portal   nginx   portal.lake3.opendatalake.com   37.27.4.125   80, 443   4h51m
+
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE    SELECTOR
+service/portal-api   ClusterIP   10.43.199.240   <none>        8000/TCP   154m   app=portal-api
+service/portal-ui    ClusterIP   10.43.193.27    <none>        80/TCP     8h     app=portal-ui
+
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES                                    SELECTOR
+deployment.apps/portal-api   1/1     1            1           154m   api          python:3.12-slim                          app=portal-api
+deployment.apps/portal-ui    1/1     1            1           8h     nginx        nginxinc/nginx-unprivileged:1.27-alpine   app=portal-ui
+
+NAME                         DATA   AGE
+configmap/kube-root-ca.crt   1      20h
+configmap/portal-api-code    1      154m
+configmap/portal-ui          3      8h
+configmap/portal-ui-nginx    1      5h41m
+configmap/portal-ui-web      1      5h41m
+
+NAME                           TYPE                DATA   AGE
+secret/portal-api-secret       Opaque              8      8h
+secret/portal-catalog-secret   Opaque              9      154m
+secret/portal-tls              kubernetes.io/tls   2      3h28m
+
+NAME                        SECRETS   AGE
+serviceaccount/default      0         20h
+serviceaccount/portal-api   0         8h
+
+NAME                        STATUS    COMPLETIONS   DURATION   AGE     CONTAINERS   IMAGES                                  SELECTOR
+job.batch/portal-minio-ro   Running   0/1           6m15s      6m15s   mc           minio/mc:RELEASE.2025-07-23T15-54-02Z   batch.kubernetes.io/controller-uid=ac3890d5-01a0-486b-9372-1c71521cb741

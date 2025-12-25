@@ -1,0 +1,54 @@
+NAME                                CLASS   HOSTS                            ADDRESS       PORTS     AGE
+ingress.networking.k8s.io/airbyte   nginx   airbyte.lake3.opendatalake.com   37.27.4.125   80, 443   18h
+
+NAME                                                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE   SELECTOR
+service/airbyte-airbyte-connector-builder-server-svc   NodePort    10.43.229.166   <none>        80:30100/TCP   19h   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=connector-builder-server
+service/airbyte-airbyte-server-svc                     ClusterIP   10.43.121.106   <none>        8001/TCP       19h   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=server
+service/airbyte-db-svc                                 ClusterIP   10.43.92.207    <none>        5432/TCP       19h   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=airbyte-db
+service/airbyte-minio-svc                              ClusterIP   10.43.203.139   <none>        9000/TCP       19h   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=airbyte-minio
+service/airbyte-temporal                               ClusterIP   10.43.96.72     <none>        7233/TCP       19h   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=temporal
+service/airbyte-workload-api-server-svc                ClusterIP   10.43.66.229    <none>        8007/TCP       19h   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=workload-api-server
+
+NAME                                               READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS                              IMAGES                                   SELECTOR
+deployment.apps/airbyte-connector-builder-server   1/1     1            1           19h   airbyte-connector-builder-server        airbyte/connector-builder-server:2.0.1   app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=connector-builder-server
+deployment.apps/airbyte-cron                       1/1     1            1           19h   airbyte-cron                            airbyte/cron:2.0.1                       app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=cron
+deployment.apps/airbyte-server                     1/1     1            1           19h   airbyte-server-container                airbyte/server:2.0.1                     app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=server
+deployment.apps/airbyte-temporal                   1/1     1            1           19h   airbyte-temporal                        temporalio/auto-setup:1.27.2             app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=temporal
+deployment.apps/airbyte-worker                     1/1     1            1           19h   airbyte-worker-container                airbyte/worker:2.0.1                     app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=worker
+deployment.apps/airbyte-workload-api-server        1/1     1            1           19h   airbyte-workload-api-server-container   airbyte/workload-api-server:2.0.1        app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=workload-api-server
+deployment.apps/airbyte-workload-launcher          1/1     1            1           19h   airbyte-workload-launcher-container     airbyte/workload-launcher:2.0.1          app.kubernetes.io/instance=airbyte,app.kubernetes.io/name=workload-launcher
+
+NAME                             READY   AGE   CONTAINERS             IMAGES
+statefulset.apps/airbyte-db      1/1     19h   airbyte-db-container   airbyte/db:2.0.1
+statefulset.apps/airbyte-minio   1/1     19h   airbyte-minio          minio/minio:RELEASE.2023-11-20T22-40-07Z
+
+NAME                                       DATA   AGE
+configmap/airbyte-airbyte-env              81     17h
+configmap/airbyte-s3-config                6      19h
+configmap/airbyte-temporal-dynamicconfig   1      19h
+configmap/kube-root-ca.crt                 1      20h
+
+NAME                                    TYPE                 DATA   AGE
+secret/airbyte-airbyte-secrets          Opaque               4      17h
+secret/airbyte-auth-secrets             Opaque               6      19h
+secret/openkpi-minio-secret             Opaque               2      19h
+secret/sh.helm.release.v1.airbyte.v10   helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v11   helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v12   helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v13   helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v14   helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v15   helm.sh/release.v1   1      17h
+secret/sh.helm.release.v1.airbyte.v16   helm.sh/release.v1   1      17h
+secret/sh.helm.release.v1.airbyte.v7    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v8    helm.sh/release.v1   1      18h
+secret/sh.helm.release.v1.airbyte.v9    helm.sh/release.v1   1      18h
+
+NAME                           SECRETS   AGE
+serviceaccount/airbyte-admin   0         19h
+serviceaccount/default         0         20h
+
+NAME                                                CREATED AT
+role.rbac.authorization.k8s.io/airbyte-admin-role   2025-12-24T20:42:58Z
+
+NAME                                                          ROLE                      AGE   USERS   GROUPS   SERVICEACCOUNTS
+rolebinding.rbac.authorization.k8s.io/airbyte-admin-binding   Role/airbyte-admin-role   19h                    /airbyte-admin

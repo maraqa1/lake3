@@ -1,0 +1,304 @@
+apiVersion: v1
+items:
+- apiVersion: networking.k8s.io/v1
+  kind: Ingress
+  metadata:
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-http01
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"cert-manager.io/cluster-issuer":"letsencrypt-http01","kubernetes.io/ingress.class":"nginx"},"name":"n8n","namespace":"n8n"},"spec":{"ingressClassName":"nginx","rules":[{"host":"n8n.lake3.opendatalake.com","http":{"paths":[{"backend":{"service":{"name":"n8n","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}],"tls":[{"hosts":["n8n.lake3.opendatalake.com"],"secretName":"n8n-tls"}]}}
+      kubernetes.io/ingress.class: nginx
+    creationTimestamp: "2025-12-24T22:24:22Z"
+    generation: 1
+    name: n8n
+    namespace: n8n
+    resourceVersion: "39220"
+    uid: 633a1b52-e4cd-4e1a-89ed-36ed41ec8f78
+  spec:
+    ingressClassName: nginx
+    rules:
+    - host: n8n.lake3.opendatalake.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: n8n
+              port:
+                number: 80
+          path: /
+          pathType: Prefix
+    tls:
+    - hosts:
+      - n8n.lake3.opendatalake.com
+      secretName: n8n-tls
+  status:
+    loadBalancer:
+      ingress:
+      - ip: 37.27.4.125
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "2"
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"name":"n8n","namespace":"n8n"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"n8n"}},"template":{"metadata":{"labels":{"app":"n8n"}},"spec":{"containers":[{"env":[{"name":"DB_TYPE","value":"postgresdb"},{"name":"DB_POSTGRESDB_HOST","value":"openkpi-postgres.open-kpi.svc.cluster.local"},{"name":"DB_POSTGRESDB_PORT","value":"5432"},{"name":"DB_POSTGRESDB_DATABASE","value":"n8n"},{"name":"DB_POSTGRESDB_USER","value":"n8n_user"},{"name":"DB_POSTGRESDB_PASSWORD","valueFrom":{"secretKeyRef":{"key":"DB_PASSWORD","name":"n8n-secret"}}},{"name":"N8N_HOST","value":"n8n.lake3.opendatalake.com"},{"name":"N8N_PORT","value":"5678"},{"name":"N8N_LISTEN_ADDRESS","value":"0.0.0.0"},{"name":"N8N_PROTOCOL","value":"https"},{"name":"WEBHOOK_URL","value":"https://n8n.lake3.opendatalake.com/"},{"name":"N8N_LOG_LEVEL","value":"info"},{"name":"N8N_ENCRYPTION_KEY","valueFrom":{"secretKeyRef":{"key":"N8N_ENCRYPTION_KEY","name":"n8n-secret"}}}],"image":"n8nio/n8n:latest","imagePullPolicy":"IfNotPresent","livenessProbe":{"failureThreshold":6,"periodSeconds":20,"tcpSocket":{"port":5678},"timeoutSeconds":2},"name":"n8n","ports":[{"containerPort":5678,"name":"http"}],"readinessProbe":{"failureThreshold":12,"periodSeconds":10,"tcpSocket":{"port":5678},"timeoutSeconds":2},"startupProbe":{"failureThreshold":120,"periodSeconds":5,"tcpSocket":{"port":5678},"timeoutSeconds":2},"volumeMounts":[{"mountPath":"/home/node/.n8n","name":"n8n-data"}]}],"securityContext":{"fsGroup":1000},"volumes":[{"name":"n8n-data","persistentVolumeClaim":{"claimName":"n8n-data"}}]}}}}
+    creationTimestamp: "2025-12-24T22:24:22Z"
+    generation: 2
+    name: n8n
+    namespace: n8n
+    resourceVersion: "28427"
+    uid: d4d1e1aa-13e3-461a-891b-3af0d2d3431c
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: n8n
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: n8n
+      spec:
+        containers:
+        - env:
+          - name: DB_TYPE
+            value: postgresdb
+          - name: DB_POSTGRESDB_HOST
+            value: openkpi-postgres.open-kpi.svc.cluster.local
+          - name: DB_POSTGRESDB_PORT
+            value: "5432"
+          - name: DB_POSTGRESDB_DATABASE
+            value: n8n
+          - name: DB_POSTGRESDB_USER
+            value: n8n_user
+          - name: DB_POSTGRESDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: DB_PASSWORD
+                name: n8n-secret
+          - name: N8N_HOST
+            value: n8n.lake3.opendatalake.com
+          - name: N8N_PORT
+            value: "5678"
+          - name: N8N_LISTEN_ADDRESS
+            value: 0.0.0.0
+          - name: N8N_PROTOCOL
+            value: https
+          - name: WEBHOOK_URL
+            value: https://n8n.lake3.opendatalake.com/
+          - name: N8N_LOG_LEVEL
+            value: info
+          - name: N8N_ENCRYPTION_KEY
+            valueFrom:
+              secretKeyRef:
+                key: N8N_ENCRYPTION_KEY
+                name: n8n-secret
+          image: n8nio/n8n:latest
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            periodSeconds: 20
+            successThreshold: 1
+            tcpSocket:
+              port: 5678
+            timeoutSeconds: 2
+          name: n8n
+          ports:
+          - containerPort: 5678
+            name: http
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 12
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 5678
+            timeoutSeconds: 2
+          resources: {}
+          startupProbe:
+            failureThreshold: 120
+            periodSeconds: 5
+            successThreshold: 1
+            tcpSocket:
+              port: 5678
+            timeoutSeconds: 2
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /home/node/.n8n
+            name: n8n-data
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          fsGroup: 1000
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: n8n-data
+          persistentVolumeClaim:
+            claimName: n8n-data
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2025-12-25T07:06:29Z"
+      lastUpdateTime: "2025-12-25T07:06:29Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-12-25T07:06:29Z"
+      lastUpdateTime: "2025-12-25T07:09:59Z"
+      message: ReplicaSet "n8n-7754fbb8b7" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    observedGeneration: 2
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"n8n","namespace":"n8n"},"spec":{"ports":[{"name":"http","port":80,"targetPort":5678}],"selector":{"app":"n8n"},"type":"ClusterIP"}}
+    creationTimestamp: "2025-12-24T22:24:22Z"
+    name: n8n
+    namespace: n8n
+    resourceVersion: "9060"
+    uid: fe88ef48-64dc-40d7-9616-ea11773c8114
+  spec:
+    clusterIP: 10.43.208.12
+    clusterIPs:
+    - 10.43.208.12
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 5678
+    selector:
+      app: n8n
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  data:
+    ca.crt: |
+      -----BEGIN CERTIFICATE-----
+      MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+      dmVyLWNhQDE3NjY2MDc1NTQwHhcNMjUxMjI0MjAxOTE0WhcNMzUxMjIyMjAxOTE0
+      WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3NjY2MDc1NTQwWTATBgcqhkjO
+      PQIBBggqhkjOPQMBBwNCAATnFiU7bBSGw1xnMhMzKu8k+B3pMR+L92SW7nRee1ix
+      lnGEK8372uuBcF8zzrJGnyyma4jMlNPjE6wgZuPi6xMlo0IwQDAOBgNVHQ8BAf8E
+      BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUK0kEelYwOY3kgq3QQ8bP
+      NVTy4HEwCgYIKoZIzj0EAwIDSQAwRgIhAMGD2PiWLWEmqssuAOFSqbIZ5w1mpVav
+      Dg26sRLLcrgqAiEAuToBfY7Yafg5C018WzHmZhts9/07vJegDAfzl0AXUgA=
+      -----END CERTIFICATE-----
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2025-12-24T20:19:25Z"
+    name: kube-root-ca.crt
+    namespace: n8n
+    resourceVersion: "450"
+    uid: 0ccd8a4c-543a-45d4-985d-05ad2df9c08e
+- apiVersion: cert-manager.io/v1
+  kind: Certificate
+  metadata:
+    creationTimestamp: "2025-12-25T11:31:34Z"
+    generation: 1
+    name: n8n-tls
+    namespace: n8n
+    ownerReferences:
+    - apiVersion: networking.k8s.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Ingress
+      name: n8n
+      uid: 633a1b52-e4cd-4e1a-89ed-36ed41ec8f78
+    resourceVersion: "39372"
+    uid: 3787bf67-be5d-4197-a5a9-a105bb9504bf
+  spec:
+    dnsNames:
+    - n8n.lake3.opendatalake.com
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: letsencrypt-http01
+    secretName: n8n-tls
+    usages:
+    - digital signature
+    - key encipherment
+  status:
+    conditions:
+    - lastTransitionTime: "2025-12-25T11:31:37Z"
+      message: Certificate is up to date and has not expired
+      observedGeneration: 1
+      reason: Ready
+      status: "True"
+      type: Ready
+    notAfter: "2026-03-25T10:33:05Z"
+    notBefore: "2025-12-25T10:33:06Z"
+    renewalTime: "2026-02-23T10:33:05Z"
+    revision: 1
+- apiVersion: acme.cert-manager.io/v1
+  kind: Order
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: n8n-tls
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: n8n-tls-rr4w5
+    creationTimestamp: "2025-12-25T11:31:35Z"
+    generation: 1
+    name: n8n-tls-1-163260902
+    namespace: n8n
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: CertificateRequest
+      name: n8n-tls-1
+      uid: 1b8e234d-da92-4bd8-ac3f-e44221a962e1
+    resourceVersion: "39364"
+    uid: 18cb3b70-1c3e-4016-84eb-1495d4c5b5c1
+  spec:
+    dnsNames:
+    - n8n.lake3.opendatalake.com
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: letsencrypt-http01
+    request: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURSBSRVFVRVNULS0tLS0KTUlJQ2tEQ0NBWGdDQVFBd0FEQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQURnZ0VQQURDQ0FRb0NnZ0VCQU1TMgpRRXg5RGtWR01jTXN2eW8wck9xcDZGbm5FdE5RNzBGSmhiMjFpSjJBdmtkL0EvOEE0cHlaUjY0Q2llNmEyRG9rCkVhVWxJSnVldDFZanBjcmxhK0NMN2F6cm40WDR3T0FUZ1IwS2tMSEtLUUQwMUpwT21GdFZJTGV6VTgvK2IzaU4KQUxBWFp2RnhtTTkwU2sySXlieXNhV1NQa29iRGg1V3R3eGI2My94Y1lYTktRMDRkamloWFdoRFE3WXZ1QlZyWApTSENJMk5OTHNyRkJ3OUg4aGlkMkFkWTRpdTRYWGRZUVJoOWZlbzJ3M0twL1lQenNlU0dtYUVNTlhJWmt3b3pyCklORWN6KzlTVlFwdFZGUkw0MXpwOW45WUF0aVhMa0Q1dm92OUVZZk9iM3NLVlBvRmFpa0Q2NWh1THVxQ1REZ1EKeHdSZjlLOGFMVFZuOGZvaXk0RUNBd0VBQWFCTE1Fa0dDU3FHU0liM0RRRUpEakU4TURvd0tBWURWUjBSQVFILwpCQjR3SElJYWJqaHVMbXhoYTJVekxtOXdaVzVrWVhSaGJHRnJaUzVqYjIwd0RnWURWUjBQQVFIL0JBUURBZ1dnCk1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQ0lMQnBvYUV2VmluYkczWHY3djEzZUhqeWpDOFp6M2sxRGJCeGgKcjRIVm5Nb3pUTUpYSDdBUjFTd1R0dnZGdnZxNjVYeGNjVGIrK2hFSXNKYzBrbTNXRVp5WjNIT2d4d2tORGdUMApRKzlMSVlRQ0x6VDg5UW4raE53SUZ6RDlQYjRHM3Iwc0Y4QzlJcXV2M2VrWDRjTUwybFc0U2ZoRGJuQkc2eGJxCktta3d4dnhrRThwcXZjNDFSZ3V2THgvRHd1Vm5TZWdDcDhtbnhmUXBpbDNtMDRSNmZEZmg5UUZCSmJ4VzNaZmEKV2RqaXg4L2ZEdU9RS0ZpK0gyQzAyRWxJQjNmMGZoK00zK1FuL083anpZczF4c0hsd1BMNFVpcUdaMEhxV3ZHdgpTaWJRTXVyZjhjUjlNQ2lZR21meXpzZHNUeU01SnExcnRLY1FENW1CL0s2VUg3a1UKLS0tLS1FTkQgQ0VSVElGSUNBVEUgUkVRVUVTVC0tLS0tCg==
+  status:
+    authorizations:
+    - challenges:
+      - token: KaM__hOSONZaMWGzcOcfZwSj47iUwWbmb_2tyQBDGjw
+        type: http-01
+        url: https://acme-v02.api.letsencrypt.org/acme/chall/2906392776/632538278996/cqTeig
+      identifier: n8n.lake3.opendatalake.com
+      initialState: valid
+      url: https://acme-v02.api.letsencrypt.org/acme/authz/2906392776/632538278996
+      wildcard: false
+    certificate: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZHakNDQkFLZ0F3SUJBZ0lTQmw3UWg3UWVVSTRCV21mUmZCcnVxOW50TUEwR0NTcUdTSWIzRFFFQkN3VUEKTURNeEN6QUpCZ05WQkFZVEFsVlRNUll3RkFZRFZRUUtFdzFNWlhRbmN5QkZibU55ZVhCME1Rd3dDZ1lEVlFRRApFd05TTVRNd0hoY05NalV4TWpJMU1UQXpNekEyV2hjTk1qWXdNekkxTVRBek16QTFXakFsTVNNd0lRWURWUVFECkV4cHVPRzR1YkdGclpUTXViM0JsYm1SaGRHRnNZV3RsTG1OdmJUQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFNUzJRRXg5RGtWR01jTXN2eW8wck9xcDZGbm5FdE5RNzBGSmhiMjFpSjJBdmtkLwpBLzhBNHB5WlI2NENpZTZhMkRva0VhVWxJSnVldDFZanBjcmxhK0NMN2F6cm40WDR3T0FUZ1IwS2tMSEtLUUQwCjFKcE9tRnRWSUxlelU4LytiM2lOQUxBWFp2RnhtTTkwU2sySXlieXNhV1NQa29iRGg1V3R3eGI2My94Y1lYTksKUTA0ZGppaFhXaERRN1l2dUJWclhTSENJMk5OTHNyRkJ3OUg4aGlkMkFkWTRpdTRYWGRZUVJoOWZlbzJ3M0twLwpZUHpzZVNHbWFFTU5YSVprd296cklORWN6KzlTVlFwdFZGUkw0MXpwOW45WUF0aVhMa0Q1dm92OUVZZk9iM3NLClZQb0ZhaWtENjVodUx1cUNURGdReHdSZjlLOGFMVFZuOGZvaXk0RUNBd0VBQWFPQ0FqUXdnZ0l3TUE0R0ExVWQKRHdFQi93UUVBd0lGb0RBZEJnTlZIU1VFRmpBVUJnZ3JCZ0VGQlFjREFRWUlLd1lCQlFVSEF3SXdEQVlEVlIwVApBUUgvQkFJd0FEQWRCZ05WSFE0RUZnUVVMdGFCQ081TjJpSHRTQzJCbytxUlBjWWRjOG93SHdZRFZSMGpCQmd3CkZvQVU1NnVmRHl3em9GUFRYazk0eUxLRURqdldrak13TXdZSUt3WUJCUVVIQVFFRUp6QWxNQ01HQ0NzR0FRVUYKQnpBQ2hoZG9kSFJ3T2k4dmNqRXpMbWt1YkdWdVkzSXViM0puTHpBbEJnTlZIUkVFSGpBY2docHVPRzR1YkdGcgpaVE11YjNCbGJtUmhkR0ZzWVd0bExtTnZiVEFUQmdOVkhTQUVEREFLTUFnR0JtZUJEQUVDQVRBdkJnTlZIUjhFCktEQW1NQ1NnSXFBZ2hoNW9kSFJ3T2k4dmNqRXpMbU11YkdWdVkzSXViM0puTHpFeE1DNWpjbXd3Z2dFTkJnb3IKQmdFRUFkWjVBZ1FDQklIK0JJSDdBUGtBZGdCSm5KdHAzaDE4N1B3MjNzMkhaS2E0VzY4S2g0QVowVlZTKytucgpLZDM0d3dBQUFadFZSMUszQUFBRUF3QkhNRVVDSVFEc2p3dWlwMXFYekYxMitHc0QxY09PQ2NqdWRTb1M0ekU2ClhValB1cTdXeFFJZ2E1dEhwOEF5SFphV0VGWmNZdVBaK1NCWmdJOHljQTZWK2VhdWZQUVpocjhBZndDbHlYaVMKWFZkR0Y0S0hEZGlKWmd0Y1ZXU0xmUUJBOHV3SGFGSFJpR2taOXdBQUFadFZSMVQrQUFnQUFBVUFMTVNzc1FRRApBRWd3UmdJaEFJSHVjMThuQUdYZStCb2pYVjdpMU5QSE1Zc09LbUJZczg4ZTd0MjN0d05yQWlFQTV2RFBqYlhxCkh3UFhTQzBPU1hsU0VDa2dZWk5wb2xIZzNnNjdGZis2aVJJd0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFBSFAKUnBwazhVdnp0Ym1vTmpDT0NPV1pQSUk2eVZMT28zOEQyL3NUZ3E2ZTZCbHRMeEZUZUVEQzhkbHJtc1ptN3ZkNwpVQ01iV1ZuejcrUnVRNTQ0ZkFveUhlMDcwUHhDT2VsWGRlYUdPR09hN2dwclA5alRkSllydWw0RUdQc3ovQ09LCjdtZ1BsU2gzQXMvNGl0dzluZU5uM2kySGtFSTdLOTdVVHVVSTg3a1IyMlhnS3IwTVUyZ1pUTFhQbkxlT0ZudE4KZTY3eUROZE1zZmVndGJzSGE0LzNVeDFCY2lhMytMOXVlaXRmR0tTVXdYVnFONEpRa2QrRmFFMzdQeGJrdWlIbgo0dTZDRTBNdzFJV3RHUHpzbC9FWlZkWFozV0NmYWwrbnY0NG1zWHhDUWsxRS9uLytDQXVyMGJWQ01VYkV3YzN4CkcyNFhIY1h2ZkdPYmxVQnp3NEk9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZCVENDQXUyZ0F3SUJBZ0lRV2dEeUV0alV0SUR6a2tGWDZpbURCVEFOQmdrcWhraUc5dzBCQVFzRkFEQlAKTVFzd0NRWURWUVFHRXdKVlV6RXBNQ2NHQTFVRUNoTWdTVzUwWlhKdVpYUWdVMlZqZFhKcGRIa2dVbVZ6WldGeQpZMmdnUjNKdmRYQXhGVEFUQmdOVkJBTVRERWxUVWtjZ1VtOXZkQ0JZTVRBZUZ3MHlOREF6TVRNd01EQXdNREJhCkZ3MHlOekF6TVRJeU16VTVOVGxhTURNeEN6QUpCZ05WQkFZVEFsVlRNUll3RkFZRFZRUUtFdzFNWlhRbmN5QkYKYm1OeWVYQjBNUXd3Q2dZRFZRUURFd05TTVRNd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFSwpBb0lCQVFDbFozQ04wRmFCWkJVWFljMjVCdFN0R1pDTUpsQTNtQlpqa2xUYjJjeUVCWlBzMCt3SUc2QmdVVU5JCmZTdkhTSmFldEMzYW5jZ25PMWVobjZ2dzFnN1VEakRLYjV1eDBkYWtuVEkrV0U0MWIwVllhSEVYL0Q3WVhZS2cKTDdKUmJMQWFYYmhaempWbHlJdWhyeEEzLytPY1hjSkpGelQvakN1TGpmQzhjU3lUREIwRnhMckh6YXJKWG56Ugp5UUgzbkFQMi9BcGQ5TnA3NXR0MlFuRHI5RTBpMmdCM2I5YkpYeGY5Mm5VdXBWY005dXBjdHVCenBXalBvWFRpCmRZSitFSi9COWFMckFlazRzUXBFek5QQ2lmVkpOWUlLTkxNYzZZakNSMDZDRGdvMjhFZFBpdkVwQkhYYXplR2EKWFA5ZW5aaVZ1cHBEMEVxaUZ3VUJCRERUTXJPUEFnTUJBQUdqZ2Znd2dmVXdEZ1lEVlIwUEFRSC9CQVFEQWdHRwpNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01DQmdnckJnRUZCUWNEQVRBU0JnTlZIUk1CQWY4RUNEQUdBUUgvCkFnRUFNQjBHQTFVZERnUVdCQlRucTU4UExET2dVOU5lVDNqSXNvUU9POWFTTXpBZkJnTlZIU01FR0RBV2dCUjUKdEZubWU3Ymw1QUZ6Z0FpSXlCcFk5dW1iYmpBeUJnZ3JCZ0VGQlFjQkFRUW1NQ1F3SWdZSUt3WUJCUVVITUFLRwpGbWgwZEhBNkx5OTRNUzVwTG14bGJtTnlMbTl5Wnk4d0V3WURWUjBnQkF3d0NqQUlCZ1puZ1F3QkFnRXdKd1lEClZSMGZCQ0F3SGpBY29CcWdHSVlXYUhSMGNEb3ZMM2d4TG1NdWJHVnVZM0l1YjNKbkx6QU5CZ2txaGtpRzl3MEIKQVFzRkFBT0NBZ0VBVVRkWVVxRWltelc3VGJyT3lwTHFDZkw3Vk93WWYvUTc5T0g1Y0hMQ1plZ2dmUWhEY29ubAprN0tnaDhiMHZpKy9YdVd1N0NOOG4vVVBlZzF2bzNHK3RhWGlycnl0dGhRaW5BSEd3Yy9VZGJPeWdKYTl6dUJjClZ5cW9IM0NYVFhESW5UKzhhK2MzYUVWTUoyU3QrcFNuNGVkK1drRHA4aWpzaWp2RXlGd0U0N2h1bFcwTHR6amcKOWZPVjVQbXJnL3p4V2JSdUwrazBEQkRIRUplbm5Dc0FlbjdjMzVQbXg3anBtSi9IdGdSaGNuejB5alNCdnlJdwo2TDFRSXVwa0N2MlNCT0RUL3hERDNnZlFReUt2NnJvVjRHMkVoZkV5QXNXcG1vanhqQ1VDR2l5Zzk3RnZEdG0vCk5LMkxTYzlseWJLeEI3M0kyK1AyRzNDYVdwdnZwQWlIQ1Z1MzBqVzhHQ3hLZGZoc1h0bkl5Mmltc2tRcVZaMm0KMFBteG9iYjI4VHVjcjd4Qks3Q3R3dlByYjc5b3M3dTJYUDNPNWY5Yi9INjZHTnlScmdsUlhscllqSTFvR1lMLwpmNEkxbi9TZ3VzZGE2V3ZBNkMxOTBreGpVMTVZMTJtSFU0K0J4eVI5Y3gyaGhHUzlmQWpNWktKc3MyOHF4dno2CkF4dTRDYURtUk5acEsvcFFyWEYxN3lYQ1hrbUVXZ3ZTT0VaeTZaOXBjYkxJVkVHY2tWL2lWZXEwQU9vMnBrZzkKcDRRUkl5MHRLMmRpUkVOTFNGMkt5c0Z3Ylk2QjI2QkZlRnMzdjFzWVZSaEZXOW5Ma09yUVZwb3JDUzBLeVptZgp3VkQ4OXFTVGxuY3RMY1puSWF2aktzS1V1MW5BMWlVMHlZTWRZZXBLUjdsV2Jud2hkeDNld29rPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+    finalizeURL: https://acme-v02.api.letsencrypt.org/acme/finalize/2906392776/462542045936
+    state: valid
+    url: https://acme-v02.api.letsencrypt.org/acme/order/2906392776/462542045936
+kind: List
+metadata:
+  resourceVersion: ""

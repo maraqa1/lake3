@@ -1,0 +1,12 @@
+NAME                     READY   STATUS      RESTARTS   AGE   IP            NODE            NOMINATED NODE   READINESS GATES
+pod/openkpi-minio-0      1/1     Running     0          19h   10.42.0.19    datalake-srv3   <none>           <none>
+pod/openkpi-postgres-0   1/1     Running     0          19h   10.42.0.18    datalake-srv3   <none>           <none>
+pod/psql-admin-506838    0/1     Completed   0          8h    10.42.0.145   datalake-srv3   <none>           <none>
+
+NAME                       TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE   SELECTOR
+service/openkpi-minio      ClusterIP   10.43.38.217   <none>        9000/TCP,9001/TCP   19h   app=openkpi-minio
+service/openkpi-postgres   ClusterIP   10.43.82.134   <none>        5432/TCP            19h   app=openkpi-postgres
+
+NAME                                READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/openkpi-minio      1/1     19h   minio        minio/minio:RELEASE.2025-07-23T15-54-02Z
+statefulset.apps/openkpi-postgres   1/1     19h   postgres     postgres:16

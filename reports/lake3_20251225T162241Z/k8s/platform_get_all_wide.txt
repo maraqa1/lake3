@@ -1,0 +1,23 @@
+NAME                              READY   STATUS             RESTARTS   AGE     IP            NODE            NOMINATED NODE   READINESS GATES
+pod/portal-api-5f9574b66c-q6qkz   1/1     Running            0          7m57s   10.42.0.177   datalake-srv3   <none>           <none>
+pod/portal-minio-ro-v6qvt         0/1     ImagePullBackOff   0          6m14s   10.42.0.180   datalake-srv3   <none>           <none>
+pod/portal-ui-bf6fb7975-jrlkl     1/1     Running            0          5h41m   10.42.0.163   datalake-srv3   <none>           <none>
+
+NAME                 TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE    SELECTOR
+service/portal-api   ClusterIP   10.43.199.240   <none>        8000/TCP   154m   app=portal-api
+service/portal-ui    ClusterIP   10.43.193.27    <none>        80/TCP     8h     app=portal-ui
+
+NAME                         READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES                                    SELECTOR
+deployment.apps/portal-api   1/1     1            1           154m   api          python:3.12-slim                          app=portal-api
+deployment.apps/portal-ui    1/1     1            1           8h     nginx        nginxinc/nginx-unprivileged:1.27-alpine   app=portal-ui
+
+NAME                                    DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES                                    SELECTOR
+replicaset.apps/portal-api-5f9574b66c   1         1         1       7m57s   api          python:3.12-slim                          app=portal-api,pod-template-hash=5f9574b66c
+replicaset.apps/portal-api-7c6d5d9f77   0         0         0       154m    api          python:3.12-slim                          app=portal-api,pod-template-hash=7c6d5d9f77
+replicaset.apps/portal-ui-5f8c9db4bc    0         0         0       8h      nginx        nginx:1.27-alpine                         app=portal-ui,pod-template-hash=5f8c9db4bc
+replicaset.apps/portal-ui-74c4cd86d     0         0         0       7h12m   nginx        nginx:1.27-alpine                         app=portal-ui,pod-template-hash=74c4cd86d
+replicaset.apps/portal-ui-77c876b5c9    0         0         0       7h8m    nginx        nginx:1.27-alpine                         app=portal-ui,pod-template-hash=77c876b5c9
+replicaset.apps/portal-ui-bf6fb7975     1         1         1       5h41m   nginx        nginxinc/nginx-unprivileged:1.27-alpine   app=portal-ui,pod-template-hash=bf6fb7975
+
+NAME                        STATUS    COMPLETIONS   DURATION   AGE     CONTAINERS   IMAGES                                  SELECTOR
+job.batch/portal-minio-ro   Running   0/1           6m14s      6m14s   mc           minio/mc:RELEASE.2025-07-23T15-54-02Z   batch.kubernetes.io/controller-uid=ac3890d5-01a0-486b-9372-1c71521cb741

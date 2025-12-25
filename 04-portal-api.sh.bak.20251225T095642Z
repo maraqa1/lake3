@@ -1,0 +1,643 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# 04A — 04-portal-api.sh (portal intelligence backend)
+#
+# Deploys an internal Portal API in namespace "platform" providing:
+#   /api/health    (overall + per-app readiness from Kubernetes)
+#   /api/catalog   (Postgres schemas/tables + MinIO buckets)
+#   /api/ingestion (Airbyte last sync summary; partial on error)
+#   /api/summary   (single payload used by UI)
+#
+# Hard rules:
+# - Source 00-env.sh and 00-lib.sh
+# - RBAC: read-only list/get/watch for pods, deploy, sts, svc, ing, events
+# - Create Postgres read-only user for catalog queries (portal_ro) if needed
+# - Create MinIO read-only user for listing buckets (portal_ro) if needed
+# - Expose Portal API internally only (ClusterIP). No Ingress.
+# ==============================================================================
+
+HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+. "${HERE}/00-env.sh"
+. "${HERE}/00-lib.sh"
+
+: "${NS:=open-kpi}"
+: "${STORAGE_CLASS:=local-path}"
+
+PLATFORM_NS="${PLATFORM_NS:-platform}"
+PORTAL_API_NAME="${PORTAL_API_NAME:-portal-api}"
+PORTAL_API_PORT="${PORTAL_API_PORT:-8000}"
+
+TARGET_NAMESPACES_DEFAULT="open-kpi airbyte n8n tickets transform platform"
+TARGET_NAMESPACES="${TARGET_NAMESPACES:-$TARGET_NAMESPACES_DEFAULT}"
+
+# ------------------------------------------------------------------------------
+# Shared Postgres (OpenKPI data plane)
+# ------------------------------------------------------------------------------
+OPENKPI_PG_SVC="${OPENKPI_PG_SVC:-openkpi-postgres.${NS}.svc.cluster.local}"
+OPENKPI_PG_PORT="${OPENKPI_PG_PORT:-5432}"
+PG_SUPER_SECRET="${PG_SUPER_SECRET:-openkpi-postgres-secret}"   # keys: POSTGRES_DB/USER/PASSWORD
+
+PORTAL_PG_USER="${PORTAL_PG_USER:-portal_ro}"
+PORTAL_PG_PASS="${PORTAL_PG_PASS:-}"                            # generated if missing
+PORTAL_PG_DB="${PORTAL_PG_DB:-postgres}"
+
+# ------------------------------------------------------------------------------
+# Shared MinIO (OpenKPI data plane)
+# ------------------------------------------------------------------------------
+OPENKPI_MINIO_SVC="${OPENKPI_MINIO_SVC:-openkpi-minio.${NS}.svc.cluster.local}"
+OPENKPI_MINIO_PORT="${OPENKPI_MINIO_PORT:-9000}"
+MINIO_ROOT_SECRET="${MINIO_ROOT_SECRET:-openkpi-minio-secret}"  # keys: MINIO_ROOT_USER/MINIO_ROOT_PASSWORD
+
+PORTAL_MINIO_USER="${PORTAL_MINIO_USER:-portal_ro}"
+PORTAL_MINIO_PASS="${PORTAL_MINIO_PASS:-}"                      # generated if missing
+
+# ------------------------------------------------------------------------------
+# Airbyte (best-effort)
+# ------------------------------------------------------------------------------
+AIRBYTE_NS="${AIRBYTE_NS:-airbyte}"
+AIRBYTE_API_URL="${AIRBYTE_API_URL:-}" # optional override
+
+rand_b64() {
+  head -c 32 /dev/urandom | base64 | tr -d '=+/' | cut -c1-32
+}
+
+log "[04A][PORTAL-API] Ensure namespace: ${PLATFORM_NS}"
+ensure_ns "${PLATFORM_NS}"
+
+# Generate passwords if not provided (do not rotate automatically)
+if [[ -z "${PORTAL_PG_PASS}" ]]; then
+  PORTAL_PG_PASS="$(rand_b64)"
+fi
+if [[ -z "${PORTAL_MINIO_PASS}" ]]; then
+  PORTAL_MINIO_PASS="$(rand_b64)"
+fi
+
+# ------------------------------------------------------------------------------
+# RBAC
+# ------------------------------------------------------------------------------
+log "[04A][PORTAL-API] Apply RBAC (read-only)"
+kubectl -n "${PLATFORM_NS}" apply -f - <<YAML
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${PORTAL_API_NAME}
+  namespace: ${PLATFORM_NS}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ${PORTAL_API_NAME}-ro
+rules:
+  - apiGroups: [""]
+    resources: ["pods","services","events"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments","statefulsets","replicasets"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get","list","watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ${PORTAL_API_NAME}-ro
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ${PORTAL_API_NAME}-ro
+subjects:
+  - kind: ServiceAccount
+    name: ${PORTAL_API_NAME}
+    namespace: ${PLATFORM_NS}
+YAML
+
+# ------------------------------------------------------------------------------
+# Portal API secret (catalog credentials)
+# ------------------------------------------------------------------------------
+log "[04A][PORTAL-API] Apply portal-api secret (PG + MinIO RO creds)"
+kubectl -n "${PLATFORM_NS}" create secret generic portal-api-secret \
+  --from-literal=PORTAL_PG_HOST="${OPENKPI_PG_SVC}" \
+  --from-literal=PORTAL_PG_PORT="${OPENKPI_PG_PORT}" \
+  --from-literal=PORTAL_PG_DB="${PORTAL_PG_DB}" \
+  --from-literal=PORTAL_PG_USER="${PORTAL_PG_USER}" \
+  --from-literal=PORTAL_PG_PASSWORD="${PORTAL_PG_PASS}" \
+  --from-literal=PORTAL_MINIO_ENDPOINT="${OPENKPI_MINIO_SVC}:${OPENKPI_MINIO_PORT}" \
+  --from-literal=PORTAL_MINIO_USER="${PORTAL_MINIO_USER}" \
+  --from-literal=PORTAL_MINIO_PASSWORD="${PORTAL_MINIO_PASS}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# ------------------------------------------------------------------------------
+# Ensure Postgres role exists (portal_ro) using superuser from openkpi-postgres-secret
+# ------------------------------------------------------------------------------
+log "[04A][PORTAL-API] Ensure Postgres role exists: ${PORTAL_PG_USER} (read-only)"
+kubectl -n "${PLATFORM_NS}" delete job "${PORTAL_API_NAME}-pg-ro" --ignore-not-found >/dev/null 2>&1 || true
+kubectl -n "${PLATFORM_NS}" apply -f - <<YAML
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${PORTAL_API_NAME}-pg-ro
+  namespace: ${PLATFORM_NS}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: psql
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: "${OPENKPI_PG_SVC}"
+            - name: PGPORT
+              value: "${OPENKPI_PG_PORT}"
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: ${PG_SUPER_SECRET}
+                  key: POSTGRES_DB
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: ${PG_SUPER_SECRET}
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${PG_SUPER_SECRET}
+                  key: POSTGRES_PASSWORD
+            - name: PORTAL_PG_USER
+              value: "${PORTAL_PG_USER}"
+            - name: PORTAL_PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: portal-api-secret
+                  key: PORTAL_PG_PASSWORD
+            - name: PORTAL_PG_DB
+              valueFrom:
+                secretKeyRef:
+                  name: portal-api-secret
+                  key: PORTAL_PG_DB
+          command: ["/bin/sh","-lc"]
+          args:
+            - |
+              set -euo pipefail
+              : "\${PGHOST:?}"
+              : "\${PGPORT:?}"
+              : "\${PGUSER:?}"
+              : "\${PGPASSWORD:?}"
+              : "\${PORTAL_PG_USER:?}"
+              : "\${PORTAL_PG_PASSWORD:?}"
+              : "\${PORTAL_PG_DB:=postgres}"
+
+              # Create role if missing (safe quoting)
+              psql -v ON_ERROR_STOP=1 -qtAc "DO \\\$\\\$
+              BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='\${PORTAL_PG_USER}') THEN
+                  EXECUTE format('CREATE ROLE %I LOGIN PASSWORD %L', '\${PORTAL_PG_USER}', '\${PORTAL_PG_PASSWORD}');
+                END IF;
+              END
+              \\\$\\\$;"
+
+              # Grant connect + read access (best-effort)
+              psql -v ON_ERROR_STOP=1 -qtAc "GRANT CONNECT ON DATABASE \${PORTAL_PG_DB} TO \${PORTAL_PG_USER};" || true
+
+              psql -v ON_ERROR_STOP=1 -qtAc "DO \\\$\\\$
+              DECLARE r RECORD;
+              BEGIN
+                FOR r IN
+                  SELECT nspname
+                  FROM pg_namespace
+                  WHERE nspname NOT IN ('pg_catalog','information_schema')
+                    AND nspname NOT LIKE 'pg_toast%'
+                    AND nspname NOT LIKE 'pg_temp_%'
+                LOOP
+                  EXECUTE format('GRANT USAGE ON SCHEMA %I TO %I;', r.nspname, '\${PORTAL_PG_USER}');
+                  EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO %I;', r.nspname, '\${PORTAL_PG_USER}');
+                  EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT ON TABLES TO %I;', r.nspname, '\${PORTAL_PG_USER}');
+                END LOOP;
+              END
+              \\\$\\\$;"
+YAML
+
+retry 45 2 kubectl -n "${PLATFORM_NS}" wait --for=condition=complete "job/${PORTAL_API_NAME}-pg-ro" --timeout=180s >/dev/null 2>&1 || \
+  warn "[04A][PORTAL-API] Postgres RO job not complete. Inspect: kubectl -n ${PLATFORM_NS} logs job/${PORTAL_API_NAME}-pg-ro"
+
+# ------------------------------------------------------------------------------
+# Ensure MinIO user exists (portal_ro) with readonly bucket-list policy
+# ------------------------------------------------------------------------------
+log "[04A][PORTAL-API] Ensure MinIO user exists: ${PORTAL_MINIO_USER} (read-only list buckets)"
+kubectl -n "${PLATFORM_NS}" delete job "${PORTAL_API_NAME}-minio-ro" --ignore-not-found >/dev/null 2>&1 || true
+kubectl -n "${PLATFORM_NS}" apply -f - <<YAML
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ${PORTAL_API_NAME}-minio-ro
+  namespace: ${PLATFORM_NS}
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2024-11-21T17-23-24Z
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://${OPENKPI_MINIO_SVC}:${OPENKPI_MINIO_PORT}"
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ${MINIO_ROOT_SECRET}
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${MINIO_ROOT_SECRET}
+                  key: MINIO_ROOT_PASSWORD
+            - name: PORTAL_MINIO_USER
+              value: "${PORTAL_MINIO_USER}"
+            - name: PORTAL_MINIO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: portal-api-secret
+                  key: PORTAL_MINIO_PASSWORD
+          command: ["/bin/sh","-lc"]
+          args:
+            - |
+              set -euo pipefail
+              : "\${MINIO_ENDPOINT:?}"
+              : "\${MINIO_ROOT_USER:?}"
+              : "\${MINIO_ROOT_PASSWORD:?}"
+              : "\${PORTAL_MINIO_USER:?}"
+              : "\${PORTAL_MINIO_PASSWORD:?}"
+
+              mc alias set openkpi "\${MINIO_ENDPOINT}" "\${MINIO_ROOT_USER}" "\${MINIO_ROOT_PASSWORD}"
+
+              cat >/tmp/portal-readonly.json <<'POL'
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Action": [
+                      "s3:ListAllMyBuckets",
+                      "s3:GetBucketLocation",
+                      "s3:ListBucket"
+                    ],
+                    "Resource": [
+                      "arn:aws:s3:::*"
+                    ]
+                  }
+                ]
+              }
+POL
+
+              mc admin policy create openkpi portal-readonly /tmp/portal-readonly.json >/dev/null 2>&1 || true
+              mc admin user add openkpi "\${PORTAL_MINIO_USER}" "\${PORTAL_MINIO_PASSWORD}" >/dev/null 2>&1 || true
+              mc admin policy attach openkpi portal-readonly --user "\${PORTAL_MINIO_USER}" >/dev/null 2>&1 || true
+YAML
+
+retry 45 2 kubectl -n "${PLATFORM_NS}" wait --for=condition=complete "job/${PORTAL_API_NAME}-minio-ro" --timeout=180s >/dev/null 2>&1 || \
+  warn "[04A][PORTAL-API] MinIO RO job not complete. Inspect: kubectl -n ${PLATFORM_NS} logs job/${PORTAL_API_NAME}-minio-ro"
+
+# ------------------------------------------------------------------------------
+# Portal API application code (FastAPI) in ConfigMap
+# ------------------------------------------------------------------------------
+log "[04A][PORTAL-API] Apply Portal API ConfigMap (FastAPI app)"
+kubectl -n "${PLATFORM_NS}" apply -f - <<YAML
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portal-api-code
+  namespace: ${PLATFORM_NS}
+data:
+  app.py: |
+    import os
+    from datetime import datetime, timezone
+    from typing import Dict, Any, List, Optional
+
+    import requests
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+
+    from kubernetes import client, config
+    import psycopg2
+    from minio import Minio
+
+    TARGET_NAMESPACES = os.getenv("PORTAL_TARGET_NAMESPACES", "open-kpi airbyte n8n tickets transform platform").split()
+    AIRBYTE_API_URL = os.getenv("AIRBYTE_API_URL", "").strip()
+
+    PG_HOST = os.getenv("PORTAL_PG_HOST", "")
+    PG_PORT = int(os.getenv("PORTAL_PG_PORT", "5432"))
+    PG_DB = os.getenv("PORTAL_PG_DB", "postgres")
+    PG_USER = os.getenv("PORTAL_PG_USER", "")
+    PG_PASSWORD = os.getenv("PORTAL_PG_PASSWORD", "")
+
+    MINIO_ENDPOINT = os.getenv("PORTAL_MINIO_ENDPOINT", "")
+    MINIO_USER = os.getenv("PORTAL_MINIO_USER", "")
+    MINIO_PASSWORD = os.getenv("PORTAL_MINIO_PASSWORD", "")
+
+    try:
+      config.load_incluster_config()
+    except Exception:
+      config.load_kube_config()
+
+    apps_v1 = client.AppsV1Api()
+
+    app = FastAPI(title="Portal API", version="0.1.0")
+
+    def now_iso() -> str:
+      return datetime.now(timezone.utc).isoformat()
+
+    def _dep_ready(dep: client.V1Deployment) -> Dict[str, Any]:
+      st = dep.status
+      desired = (st.replicas or 0)
+      available = (st.available_replicas or 0)
+      ready = (st.ready_replicas or 0)
+      ok = (desired == 0 and available == 0) or (available >= max(1, desired))
+      return {"name": dep.metadata.name, "kind": "Deployment", "namespace": dep.metadata.namespace,
+              "desired": desired, "ready": ready, "available": available, "ok": ok}
+
+    def _sts_ready(sts: client.V1StatefulSet) -> Dict[str, Any]:
+      st = sts.status
+      desired = (sts.spec.replicas or 0)
+      ready = (st.ready_replicas or 0)
+      ok = (desired == 0 and ready == 0) or (ready >= desired)
+      return {"name": sts.metadata.name, "kind": "StatefulSet", "namespace": sts.metadata.namespace,
+              "desired": desired, "ready": ready, "ok": ok}
+
+    def k8s_health() -> Dict[str, Any]:
+      items: List[Dict[str, Any]] = []
+      errors: List[Dict[str, Any]] = []
+
+      for ns in TARGET_NAMESPACES:
+        try:
+          deps = apps_v1.list_namespaced_deployment(ns).items
+          for d in deps:
+            items.append(_dep_ready(d))
+          stss = apps_v1.list_namespaced_stateful_set(ns).items
+          for s in stss:
+            items.append(_sts_ready(s))
+        except Exception as e:
+          errors.append({"namespace": ns, "error": str(e)})
+
+      bad = [x for x in items if x.get("ok") is False]
+      overall_ok = (len(bad) == 0)
+
+      return {"ts": now_iso(), "overall_ok": overall_ok, "workloads": items, "errors": errors}
+
+    def pg_catalog() -> Dict[str, Any]:
+      out: Dict[str, Any] = {"ts": now_iso(), "postgres": {}, "error": None}
+      try:
+        conn = psycopg2.connect(
+          host=PG_HOST, port=PG_PORT, dbname=PG_DB, user=PG_USER, password=PG_PASSWORD,
+          connect_timeout=3
+        )
+        cur = conn.cursor()
+        cur.execute("""
+          SELECT table_schema, table_name
+          FROM information_schema.tables
+          WHERE table_type='BASE TABLE'
+            AND table_schema NOT IN ('pg_catalog','information_schema')
+          ORDER BY table_schema, table_name;
+        """)
+        rows = cur.fetchall()
+        schemas: Dict[str, List[str]] = {}
+        for sch, tbl in rows:
+          schemas.setdefault(sch, []).append(tbl)
+
+        out["postgres"] = {
+          "host": PG_HOST, "port": PG_PORT, "db": PG_DB,
+          "schemas": [{"schema": k, "tables": v, "table_count": len(v)} for k, v in schemas.items()],
+          "schema_count": len(schemas),
+          "table_count": sum(len(v) for v in schemas.values()),
+        }
+        cur.close()
+        conn.close()
+      except Exception as e:
+        out["error"] = str(e)
+      return out
+
+    def minio_catalog() -> Dict[str, Any]:
+      out: Dict[str, Any] = {"ts": now_iso(), "minio": {}, "error": None}
+      try:
+        endpoint = MINIO_ENDPOINT.replace("http://", "").replace("https://", "")
+        m = Minio(endpoint, access_key=MINIO_USER, secret_key=MINIO_PASSWORD, secure=False)
+        buckets = m.list_buckets()
+        out["minio"] = {
+          "endpoint": MINIO_ENDPOINT,
+          "bucket_count": len(buckets),
+          "buckets": [{"name": b.name, "creationDate": b.creation_date.isoformat() if b.creation_date else None} for b in buckets],
+        }
+      except Exception as e:
+        out["error"] = str(e)
+      return out
+
+    def airbyte_ingestion() -> Dict[str, Any]:
+      out: Dict[str, Any] = {"ts": now_iso(), "airbyte": {}, "error": None}
+      if not AIRBYTE_API_URL:
+        # common internal candidates (best-effort)
+        candidates = [
+          "http://airbyte-webapp.airbyte.svc.cluster.local",
+          "http://airbyte-server.airbyte.svc.cluster.local",
+          "http://airbyte-airbyte-webapp-svc.airbyte.svc.cluster.local",
+          "http://airbyte-airbyte-server-svc.airbyte.svc.cluster.local",
+        ]
+      else:
+        candidates = [AIRBYTE_API_URL.rstrip("/")]
+
+      last_err: Optional[str] = None
+      for base in candidates:
+        try:
+          # health (varies by build)
+          try:
+            r = requests.get(f"{base}/api/v1/health", timeout=3)
+            if r.status_code >= 400:
+              raise RuntimeError(f"health {r.status_code}")
+          except Exception:
+            r2 = requests.get(f"{base}/health", timeout=3)
+            if r2.status_code >= 400:
+              raise RuntimeError(f"health {r2.status_code}")
+
+          payload = {"configTypes": ["sync"], "pagination": {"pageSize": 5, "rowOffset": 0}}
+          rj = requests.post(f"{base}/api/v1/jobs/list", json=payload, timeout=5)
+          if rj.status_code >= 400:
+            payload2 = {"pagination": {"pageSize": 5, "rowOffset": 0}}
+            rj2 = requests.post(f"{base}/api/v1/jobs/list", json=payload2, timeout=5)
+            if rj2.status_code >= 400:
+              raise RuntimeError(f"jobs list {rj.status_code}/{rj2.status_code}")
+            data = rj2.json()
+          else:
+            data = rj.json()
+
+          jobs = data.get("jobs", []) if isinstance(data, dict) else []
+          summary = None
+          if jobs:
+            j0 = jobs[0]
+            summary = {
+              "jobId": j0.get("id"),
+              "configId": j0.get("configId"),
+              "status": j0.get("status"),
+              "createdAt": j0.get("createdAt"),
+              "updatedAt": j0.get("updatedAt"),
+            }
+
+          out["airbyte"] = {
+            "base_url": base,
+            "reachable": True,
+            "recent_job": summary,
+            "job_count_returned": len(jobs),
+          }
+          out["error"] = None
+          return out
+
+        except Exception as e:
+          last_err = f"{base}: {e}"
+
+      out["airbyte"] = {"reachable": False}
+      out["error"] = last_err or "Airbyte unreachable"
+      return out
+
+    @app.get("/api/health")
+    def api_health():
+      return JSONResponse(k8s_health())
+
+    @app.get("/api/catalog")
+    def api_catalog():
+      return JSONResponse({"ts": now_iso(), "postgres": pg_catalog(), "minio": minio_catalog()})
+
+    @app.get("/api/ingestion")
+    def api_ingestion():
+      return JSONResponse(airbyte_ingestion())
+
+    @app.get("/api/summary")
+    def api_summary():
+      health = k8s_health()
+      pg = pg_catalog()
+      mn = minio_catalog()
+      ing = airbyte_ingestion()
+      return JSONResponse({
+        "ts": now_iso(),
+        "overall_ok": bool(health.get("overall_ok", False)),
+        "health": health,
+        "catalog": {"postgres": pg, "minio": mn},
+        "ingestion": ing,
+      })
+
+  requirements.txt: |
+    fastapi==0.115.5
+    uvicorn[standard]==0.30.6
+    kubernetes==31.0.0
+    psycopg2-binary==2.9.9
+    minio==7.2.9
+    requests==2.32.3
+YAML
+
+# ------------------------------------------------------------------------------
+# Deployment + ClusterIP Service (no Ingress)
+# ------------------------------------------------------------------------------
+log "[04A][PORTAL-API] Deploy Portal API (ClusterIP only)"
+kubectl -n "${PLATFORM_NS}" apply -f - <<YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${PORTAL_API_NAME}
+  namespace: ${PLATFORM_NS}
+  labels:
+    app: ${PORTAL_API_NAME}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${PORTAL_API_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${PORTAL_API_NAME}
+    spec:
+      serviceAccountName: ${PORTAL_API_NAME}
+      containers:
+        - name: api
+          image: python:3.11-slim
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORTAL_TARGET_NAMESPACES
+              value: "${TARGET_NAMESPACES}"
+            - name: AIRBYTE_API_URL
+              value: "${AIRBYTE_API_URL}"
+          envFrom:
+            - secretRef:
+                name: portal-api-secret
+          ports:
+            - name: http
+              containerPort: ${PORTAL_API_PORT}
+          volumeMounts:
+            - name: code
+              mountPath: /app
+          workingDir: /app
+          command: ["/bin/sh","-lc"]
+          args:
+            - |
+              set -euo pipefail
+              python -m pip install --no-cache-dir -r /app/requirements.txt
+              exec python -m uvicorn app:app --host 0.0.0.0 --port ${PORTAL_API_PORT}
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: ${PORTAL_API_PORT}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: ${PORTAL_API_PORT}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: code
+          configMap:
+            name: portal-api-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${PORTAL_API_NAME}
+  namespace: ${PLATFORM_NS}
+  labels:
+    app: ${PORTAL_API_NAME}
+spec:
+  type: ClusterIP
+  selector:
+    app: ${PORTAL_API_NAME}
+  ports:
+    - name: http
+      port: ${PORTAL_API_PORT}
+      targetPort: ${PORTAL_API_PORT}
+YAML
+
+log "[04A][PORTAL-API] Wait for deployment readiness"
+kubectl_wait_deploy "${PLATFORM_NS}" "${PORTAL_API_NAME}" "240s"
+
+cat <<EOF
+[04A][PORTAL-API] READY (internal only)
+- Service: ${PORTAL_API_NAME}.${PLATFORM_NS}.svc.cluster.local:${PORTAL_API_PORT}
+- Endpoints:
+  - /api/health
+  - /api/catalog
+  - /api/ingestion
+  - /api/summary
+EOF

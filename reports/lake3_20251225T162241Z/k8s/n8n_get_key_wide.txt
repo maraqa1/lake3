@@ -1,0 +1,18 @@
+NAME                            CLASS   HOSTS                        ADDRESS       PORTS     AGE
+ingress.networking.k8s.io/n8n   nginx   n8n.lake3.opendatalake.com   37.27.4.125   80, 443   17h
+
+NAME          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/n8n   ClusterIP   10.43.208.12   <none>        80/TCP    17h   app=n8n
+
+NAME                  READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES             SELECTOR
+deployment.apps/n8n   1/1     1            1           17h   n8n          n8nio/n8n:latest   app=n8n
+
+NAME                         DATA   AGE
+configmap/kube-root-ca.crt   1      20h
+
+NAME                TYPE                DATA   AGE
+secret/n8n-secret   Opaque              2      18h
+secret/n8n-tls      kubernetes.io/tls   2      4h51m
+
+NAME                     SECRETS   AGE
+serviceaccount/default   0         20h

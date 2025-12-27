@@ -5,6 +5,20 @@ set -euo pipefail
 # Open KPI — top-level installer orchestrator (GitHub runner)
 # File: install.sh
 # ==============================================================================
+# Order enforced:
+#   00-env.sh (source only)
+#   01-core.sh
+#   02-data-plane.sh
+#   02-A-minio-https.sh
+#   03-app-airbyte.sh
+#   03A-airbyte-minio-docstore-fix.sh
+#   03-app-n8n.sh
+#   03-app-zammad.sh
+#   03-app-dbt.sh
+#   04-portal-api.sh
+#   04-portal-ui.sh
+#   05-validate.sh
+# ==============================================================================
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -15,29 +29,29 @@ usage() {
 Usage: ./install.sh [flags]
 
 Flags:
-  --core       Run core cluster setup (01-core.sh)
-  --data       Run shared data plane (02-data-plane.sh)
+  --core         Run core cluster setup (01-core.sh)
+  --data         Run shared data plane (02-data-plane.sh)
+  --minio-https  Run MinIO HTTPS/menu module (02-A-minio-https.sh)
 
-  --airbyte    Install Airbyte (03-app-airbyte.sh)
-  --n8n        Install n8n (03-app-n8n.sh)
-  --zammad     Install Zammad (03-app-zammad.sh)
-  --dbt        Install dbt runner + cron (03-app-dbt.sh)
+  --airbyte      Install Airbyte (03-app-airbyte.sh) + apply docstore fix (03A-airbyte-minio-docstore-fix.sh)
+  --n8n          Install n8n (03-app-n8n.sh)
+  --zammad       Install Zammad (03-app-zammad.sh)
+  --dbt          Install dbt runner + cron (03-app-dbt.sh)
 
-  --portal     Deploy portal API + UI (04-portal-api.sh + 04-portal-ui.sh)
+  --portal       Deploy portal API + UI (04-portal-api.sh + 04-portal-ui.sh)
 
-  --all        Run full install (default)
-  -h, --help   Show help
+  --all          Run full install (default)
+  -h, --help     Show help
 
 Examples:
   ./install.sh
-  ./install.sh --core --data --portal
-  ./install.sh --airbyte --portal
+  ./install.sh --core --data --minio-https --airbyte
+  ./install.sh --portal
 EOF
 }
 
 mkdir -p /var/log/open-kpi
 LOG_FILE="/var/log/open-kpi/install-$(timestamp).log"
-
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "[INSTALL] start $(timestamp)"
@@ -47,6 +61,7 @@ echo "[INSTALL] cwd $HERE"
 # Flags
 RUN_CORE=0
 RUN_DATA=0
+RUN_MINIO_HTTPS=0
 RUN_AIRBYTE=0
 RUN_N8N=0
 RUN_ZAMMAD=0
@@ -66,6 +81,9 @@ if [[ $# -gt 0 ]]; then
         ;;
       --data)
         RUN_DATA=1
+        ;;
+      --minio-https)
+        RUN_MINIO_HTTPS=1
         ;;
       --airbyte)
         RUN_AIRBYTE=1
@@ -99,11 +117,23 @@ fi
 if [[ "$RUN_ALL" -eq 1 ]]; then
   RUN_CORE=1
   RUN_DATA=1
+  RUN_MINIO_HTTPS=1
   RUN_AIRBYTE=1
   RUN_N8N=1
   RUN_ZAMMAD=1
   RUN_DBT=1
   RUN_PORTAL=1
+fi
+
+# If Airbyte is requested, ensure data-plane + minio-https happen first
+if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
+  RUN_DATA=1
+  RUN_MINIO_HTTPS=1
+fi
+
+# If minio-https requested, ensure data-plane happens first
+if [[ "$RUN_MINIO_HTTPS" -eq 1 ]]; then
+  RUN_DATA=1
 fi
 
 # Validate required module files exist
@@ -116,13 +146,18 @@ need_file() {
 }
 
 need_file "00-env.sh"
+need_file "00-lib.sh"
 need_file "01-core.sh"
 need_file "02-data-plane.sh"
+need_file "02-A-minio-https.sh"
 need_file "04-portal-api.sh"
 need_file "04-portal-ui.sh"
 need_file "05-validate.sh"
 
-if [[ "$RUN_AIRBYTE" -eq 1 ]]; then need_file "03-app-airbyte.sh"; fi
+if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
+  need_file "03-app-airbyte.sh"
+  need_file "03A-airbyte-minio-docstore-fix.sh"
+fi
 if [[ "$RUN_N8N" -eq 1 ]]; then need_file "03-app-n8n.sh"; fi
 if [[ "$RUN_ZAMMAD" -eq 1 ]]; then need_file "03-app-zammad.sh"; fi
 if [[ "$RUN_DBT" -eq 1 ]]; then need_file "03-app-dbt.sh"; fi
@@ -162,9 +197,15 @@ if [[ "$RUN_DATA" -eq 1 ]]; then
   run_step "data-plane" "02-data-plane.sh"
 fi
 
+if [[ "$RUN_MINIO_HTTPS" -eq 1 ]]; then
+  run_step "minio-https" "02-A-minio-https.sh"
+fi
+
 # Apps
 if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
   run_step "airbyte" "03-app-airbyte.sh"
+  # Repeatable corrective module: fixes docstore/MinIO alias/keys/env and restarts Airbyte
+  run_step "airbyte-minio-docstore-fix" "03A-airbyte-minio-docstore-fix.sh"
 fi
 
 if [[ "$RUN_N8N" -eq 1 ]]; then
@@ -192,10 +233,10 @@ fi
 
 PATCH_PORTAL="${HERE}/patch-portal-repeatable.sh"
 if [[ -x "${PATCH_PORTAL}" ]]; then
-  log "[PATCH][PORTAL] Running repeatable portal patch"
+  echo "[PATCH][PORTAL] Running repeatable portal patch"
   "${PATCH_PORTAL}"
 else
-  log "[PATCH][PORTAL] patch-portal-repeatable.sh not found or not executable; skipping"
+  echo "[PATCH][PORTAL] patch-portal-repeatable.sh not found or not executable; skipping"
 fi
 
 # Validation always runs

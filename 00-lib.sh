@@ -8,9 +8,9 @@
 
 _ts_utc() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 
-log()  { printf '%s %s\n' "$(_ts_utc)" "[INFO] $*" >&2; }
-warn() { printf '%s %s\n' "$(_ts_utc)" "[WARN] $*" >&2; }
-fatal(){ printf '%s %s\n' "$(_ts_utc)" "[FATAL] $*" >&2; exit 1; }
+log()   { printf '%s %s\n' "$(_ts_utc)" "[INFO] $*" >&2; }
+warn()  { printf '%s %s\n' "$(_ts_utc)" "[WARN] $*" >&2; }
+fatal() { printf '%s %s\n' "$(_ts_utc)" "[FATAL] $*" >&2; exit 1; }
 
 # ------------------------------------------------------------------------------
 # Preconditions
@@ -69,6 +69,22 @@ ensure_ns() {
   kubectl create ns "${ns}" >/dev/null
 }
 
+k_exists() {
+  # Usage: k_exists <ns> <kind> <name>
+  local ns="${1:-}" kind="${2:-}" name="${3:-}"
+  [[ -n "${ns}" && -n "${kind}" && -n "${name}" ]] || fatal "k_exists requires <ns> <kind> <name>"
+  require_cmd kubectl
+  kubectl -n "${ns}" get "${kind}" "${name}" >/dev/null 2>&1
+}
+
+k_first_name_by_label() {
+  # Usage: k_first_name_by_label <ns> <kind> <label_selector>
+  local ns="${1:-}" kind="${2:-}" sel="${3:-}"
+  [[ -n "${ns}" && -n "${kind}" && -n "${sel}" ]] || fatal "k_first_name_by_label requires <ns> <kind> <label_selector>"
+  require_cmd kubectl
+  kubectl -n "${ns}" get "${kind}" -l "${sel}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true
+}
+
 kubectl_wait_deploy() {
   local ns="${1:-}" deploy="${2:-}" timeout="${3:-}"
   [[ -n "${ns}" && -n "${deploy}" && -n "${timeout}" ]] || fatal "kubectl_wait_deploy requires <ns> <deploy> <timeout>"
@@ -80,7 +96,32 @@ kubectl_wait_sts() {
   local ns="${1:-}" sts="${2:-}" timeout="${3:-}"
   [[ -n "${ns}" && -n "${sts}" && -n "${timeout}" ]] || fatal "kubectl_wait_sts requires <ns> <sts> <timeout>"
   require_cmd kubectl
-  kubectl -n "${ns}" rollout status "statefulset/${sts}" --timeout="${timeout}"
+  kubectl -n "${ns}" rollout status "sts/${sts}" --timeout="${timeout}"
+}
+
+kubectl_rollout_restart_deploy() {
+  # Usage: kubectl_rollout_restart_deploy <ns> <deploy> <timeout>
+  local ns="${1:-}" deploy="${2:-}" timeout="${3:-}"
+  [[ -n "${ns}" && -n "${deploy}" && -n "${timeout}" ]] || fatal "kubectl_rollout_restart_deploy requires <ns> <deploy> <timeout>"
+  require_cmd kubectl
+  kubectl -n "${ns}" rollout restart "deploy/${deploy}" >/dev/null
+  kubectl -n "${ns}" rollout status "deploy/${deploy}" --timeout="${timeout}"
+}
+
+kubectl_delete_pods_by_selector() {
+  # Usage: kubectl_delete_pods_by_selector <ns> <label_selector>
+  local ns="${1:-}" sel="${2:-}"
+  [[ -n "${ns}" && -n "${sel}" ]] || fatal "kubectl_delete_pods_by_selector requires <ns> <label_selector>"
+  require_cmd kubectl
+  kubectl -n "${ns}" delete pod -l "${sel}" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+}
+
+kubectl_delete_pods_by_job() {
+  # Usage: kubectl_delete_pods_by_job <ns> <job_name>
+  local ns="${1:-}" job="${2:-}"
+  [[ -n "${ns}" && -n "${job}" ]] || fatal "kubectl_delete_pods_by_job requires <ns> <job_name>"
+  require_cmd kubectl
+  kubectl_delete_pods_by_selector "${ns}" "job-name=${job}"
 }
 
 # ------------------------------------------------------------------------------
@@ -92,7 +133,5 @@ apply_yaml() {
   local yaml="${1:-}"
   [[ -n "${yaml}" ]] || fatal "apply_yaml requires a non-empty YAML string"
   require_cmd kubectl
-
-  # Preserve content exactly; avoid echo -e quirks.
   printf '%s\n' "${yaml}" | kubectl apply -f -
 }

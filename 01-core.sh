@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ==============================================================================
+# 01-core.sh — Core Platform Foundation (k3s + kubeconfig + kubectl + helm + ingress + TLS)
+#
+# Drop-in fixes:
+# - kubectl version check compatible with kubectl 1.33+ (no --short)
+# - T01 uses portable connectivity probes:
+#     kubectl version --client
+#     kubectl cluster-info
+#     kubectl get --raw=/readyz
+# - All tests stay idempotent and diagnostic-first
+# ==============================================================================
+
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "${HERE}/00-env.sh"
@@ -9,9 +21,6 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 log "[01][CORE] start"
 
-# ------------------------------------------------------------------------------
-# k3s + kubeconfig + API wait (single implementation; rerun-safe)
-# ------------------------------------------------------------------------------
 ensure_k3s_running() {
   if command -v k3s >/dev/null 2>&1 && systemctl is-active --quiet k3s; then
     log "[01][CORE] k3s already installed and active"
@@ -37,37 +46,16 @@ ensure_root_kubeconfig() {
   local dst="/root/.kube/config"
 
   [[ -f "${src}" ]] || fatal "k3s kubeconfig not found at ${src}"
-
   install -d -m 700 /root/.kube
+
   if [[ ! -f "${dst}" ]] || ! cmp -s "${src}" "${dst}"; then
     cp -f "${src}" "${dst}"
     chmod 600 "${dst}"
   fi
+
   export KUBECONFIG="${dst}"
 }
 
-wait_kube_api() {
-  log "[01][CORE] wait for kube-apiserver /readyz"
-  if retry 40 3 kubectl get --raw=/readyz >/dev/null 2>&1; then
-    return 0
-  fi
-
-  warn "[01][CORE] apiserver not reachable; restarting k3s once"
-  systemctl restart k3s >/dev/null 2>&1 || true
-  retry 20 3 systemctl is-active --quiet k3s || fatal "k3s failed to restart"
-
-  retry 60 3 kubectl get --raw=/readyz >/dev/null 2>&1 || {
-    warn "[01][CORE] diagnostics (k3s + apiserver)"
-    systemctl --no-pager -l status k3s | sed -n '1,140p' || true
-    journalctl -u k3s --no-pager -n 200 || true
-    ss -lntp | egrep ':(6443|80|443)\b' || true
-    fatal "k3s API not reachable"
-  }
-}
-
-# ------------------------------------------------------------------------------
-# kubectl: install if missing (only here)
-# ------------------------------------------------------------------------------
 ensure_kubectl() {
   if command -v kubectl >/dev/null 2>&1; then
     return 0
@@ -80,9 +68,6 @@ ensure_kubectl() {
   kubectl version --client >/dev/null
 }
 
-# ------------------------------------------------------------------------------
-# helm: install if missing (only here)
-# ------------------------------------------------------------------------------
 ensure_helm() {
   if command -v helm >/dev/null 2>&1; then
     return 0
@@ -92,9 +77,28 @@ ensure_helm() {
   helm version >/dev/null
 }
 
-# ------------------------------------------------------------------------------
-# StorageClass: ensure default exists; set local-path as default if missing
-# ------------------------------------------------------------------------------
+wait_kube_api() {
+  log "[01][CORE] wait for kube-apiserver /readyz (KUBECONFIG=${KUBECONFIG})"
+
+  if retry 40 3 kubectl get --raw=/readyz >/dev/null 2>&1; then
+    return 0
+  fi
+
+  warn "[01][CORE] apiserver not reachable; restarting k3s once"
+  systemctl restart k3s >/dev/null 2>&1 || true
+  retry 20 3 systemctl is-active --quiet k3s || fatal "k3s failed to restart"
+
+  retry 60 3 kubectl get --raw=/readyz >/dev/null 2>&1 || {
+    warn "[01][CORE] diagnostics (k3s + kubectl)"
+    systemctl --no-pager -l status k3s | sed -n '1,180p' || true
+    journalctl -u k3s --no-pager -n 250 || true
+    kubectl version --client 2>&1 | sed -n '1,40p' || true
+    kubectl config view --minify 2>/dev/null | sed -n '1,120p' || true
+    ss -lntp | egrep ':(6443|80|443)\b' || true
+    fatal "k3s API not reachable"
+  }
+}
+
 ensure_default_storageclass() {
   log "[01][CORE] ensure default StorageClass (want: ${STORAGE_CLASS})"
 
@@ -131,21 +135,15 @@ YAML
   warn "[01][CORE] no default StorageClass found, and ${STORAGE_CLASS} does not exist; leaving as-is"
 }
 
-# ------------------------------------------------------------------------------
-# Ingress: validate traefik or install ingress-nginx (single controller)
-# ------------------------------------------------------------------------------
 ensure_ingress() {
   case "${INGRESS_CLASS}" in
     traefik)
       log "[01][CORE] validate traefik (k3s default)"
       ensure_ns kube-system
-      if ! kubectl -n kube-system get deploy traefik >/dev/null 2>&1; then
-        fatal "INGRESS_CLASS=traefik but kube-system/traefik deployment not found"
-      fi
+      kubectl -n kube-system get deploy traefik >/dev/null 2>&1 || fatal "INGRESS_CLASS=traefik but kube-system/traefik not found"
       kubectl_wait_deploy kube-system traefik 600s
       kubectl get ingressclass traefik >/dev/null 2>&1 || true
       ;;
-
     nginx)
       log "[01][CORE] nginx selected: remove k3s traefik HelmCharts (if present)"
       kubectl -n kube-system delete helmchart traefik traefik-crd --ignore-not-found >/dev/null 2>&1 || true
@@ -170,16 +168,12 @@ ensure_ingress() {
       kubectl_wait_deploy ingress-nginx ingress-nginx-controller 600s
       kubectl get ingressclass nginx >/dev/null 2>&1 || true
       ;;
-
     *)
       fatal "Unsupported INGRESS_CLASS=${INGRESS_CLASS} (expected traefik|nginx)"
       ;;
   esac
 }
 
-# ------------------------------------------------------------------------------
-# TLS: cert-manager + ClusterIssuer (HTTP-01) when enabled
-# ------------------------------------------------------------------------------
 ensure_tls() {
   if [[ "${TLS_MODE}" != "per-host-http01" ]]; then
     log "[01][CORE] TLS_MODE=${TLS_MODE}; skipping cert-manager/issuer"
@@ -224,9 +218,6 @@ YAML
   retry 20 3 kubectl get clusterissuer letsencrypt-http01 >/dev/null 2>&1 || fatal "ClusterIssuer not created"
 }
 
-# ------------------------------------------------------------------------------
-# Namespaces: platform layout (no app installs here)
-# ------------------------------------------------------------------------------
 ensure_platform_namespaces() {
   log "[01][CORE] ensure namespaces"
   ensure_ns open-kpi
@@ -237,40 +228,69 @@ ensure_platform_namespaces() {
   ensure_ns transform
 }
 
-# ------------------------------------------------------------------------------
-# Validations
-# ------------------------------------------------------------------------------
-validate_core() {
-  log "[01][CORE] validation: nodes"
+run_tests() {
+  log "[01][CORE][TEST] begin"
+
+  log "[01][CORE][TEST][T01] kubectl connectivity (portable)"
+  if ! out="$(kubectl version --client 2>&1)"; then
+    warn "[T01] kubectl version --client failed output:"
+    printf '%s\n' "$out" | sed -n '1,80p' >&2 || true
+    warn "[T01] kubeconfig minify:"
+    kubectl config view --minify 2>/dev/null | sed -n '1,120p' >&2 || true
+    fatal "[T01] kubectl cannot run"
+  fi
+  kubectl cluster-info >/dev/null 2>&1 || fatal "[T01] kubectl cluster-info failed"
+  kubectl get --raw=/readyz >/dev/null 2>&1 || fatal "[T01] apiserver /readyz failed"
+
+  log "[01][CORE][TEST][T02] node Ready"
   kubectl get nodes -o wide
+  kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -qE ' True$' \
+    || fatal "[T02] no Ready node detected"
 
-  log "[01][CORE] validation: namespaces"
-  kubectl get ns | egrep -E '(^NAME|open-kpi|airbyte|n8n|tickets|platform|transform|ingress-nginx|cert-manager)' || true
+  log "[01][CORE][TEST][T03] namespaces exist"
+  for ns in open-kpi airbyte n8n tickets platform transform; do
+    kubectl get ns "${ns}" >/dev/null 2>&1 || fatal "[T03] missing namespace: ${ns}"
+  done
 
-  log "[01][CORE] validation: storageclasses"
-  kubectl get sc -o wide || true
+  log "[01][CORE][TEST][T04] default StorageClass"
+  local dsc
+  dsc="$(kubectl get sc -o jsonpath='{range .items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")]}{.metadata.name}{"\n"}{end}' 2>/dev/null | head -n1 || true)"
+  [[ -n "${dsc}" ]] || fatal "[T04] default StorageClass is missing"
+  log "[01][CORE][TEST] default StorageClass = ${dsc}"
 
-  log "[01][CORE] validation: ingress"
-  kubectl get ingressclass 2>/dev/null || true
+  log "[01][CORE][TEST][T05] ingress controller ready (${INGRESS_CLASS})"
   case "${INGRESS_CLASS}" in
-    traefik) kubectl -n kube-system get deploy,svc | egrep -i '(^NAME|traefik)' || true ;;
-    nginx)   kubectl -n ingress-nginx get deploy,svc | egrep -i '(^NAME|ingress-nginx)' || true ;;
+    traefik)
+      kubectl -n kube-system get deploy traefik >/dev/null 2>&1 || fatal "[T05] traefik deployment missing"
+      kubectl_wait_deploy kube-system traefik 600s || fatal "[T05] traefik not ready"
+      ;;
+    nginx)
+      kubectl -n ingress-nginx get deploy ingress-nginx-controller >/dev/null 2>&1 || fatal "[T05] ingress-nginx-controller missing"
+      kubectl_wait_deploy ingress-nginx ingress-nginx-controller 600s || fatal "[T05] ingress-nginx-controller not ready"
+      ;;
   esac
 
+  log "[01][CORE][TEST][T06] TLS stack checks (TLS_MODE=${TLS_MODE})"
   if [[ "${TLS_MODE}" == "per-host-http01" ]]; then
-    log "[01][CORE] validation: cert-manager + issuer"
-    kubectl -n cert-manager get deploy,pods -o wide || true
-    kubectl get clusterissuer letsencrypt-http01 -o wide || true
+    kubectl -n cert-manager get deploy cert-manager >/dev/null 2>&1 || fatal "[T06] cert-manager deployment missing"
+    kubectl -n cert-manager get deploy cert-manager-webhook >/dev/null 2>&1 || fatal "[T06] cert-manager-webhook missing"
+    kubectl -n cert-manager get deploy cert-manager-cainjector >/dev/null 2>&1 || fatal "[T06] cert-manager-cainjector missing"
+    kubectl_wait_deploy cert-manager cert-manager 600s || fatal "[T06] cert-manager not ready"
+    kubectl_wait_deploy cert-manager cert-manager-webhook 600s || fatal "[T06] cert-manager-webhook not ready"
+    kubectl_wait_deploy cert-manager cert-manager-cainjector 600s || fatal "[T06] cert-manager-cainjector not ready"
+    kubectl get clusterissuer letsencrypt-http01 >/dev/null 2>&1 || fatal "[T06] ClusterIssuer letsencrypt-http01 missing"
   fi
+
+  log "[01][CORE][TEST] PASS"
 }
 
 # ------------------------------------------------------------------------------
 # Run
 # ------------------------------------------------------------------------------
 ensure_k3s_running
+ensure_root_kubeconfig
 ensure_kubectl
 ensure_helm
-ensure_root_kubeconfig
 wait_kube_api
 
 retry 10 2 kubectl get nodes >/dev/null 2>&1 || fatal "kubectl cannot reach cluster after kubeconfig setup"
@@ -279,6 +299,6 @@ ensure_platform_namespaces
 ensure_default_storageclass
 ensure_ingress
 ensure_tls
-validate_core
+run_tests
 
 log "[01][CORE] done"

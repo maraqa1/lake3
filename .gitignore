@@ -1,15 +1,5 @@
-# secrets
-open-kpi.env
-*.env
-*.backup.*
-
-# local artifacts
-backups/
-*.tar.gz
-*.log
-.values-*.yaml
-*.skip
-
-# temp
-__pycache__/
-*.pyc
+*.bak.*
+*.bak
+*.tmp
+*.swp
+.DS_Store

@@ -291,3 +291,6 @@ _openkpi_env_upsert_kv "ZAMMAD_ADMIN_EMAIL" "$ZAMMAD_ADMIN_EMAIL" "$OPENKPI_ENV_
 _openkpi_env_upsert_kv "ZAMMAD_ADMIN_PASSWORD" "$ZAMMAD_ADMIN_PASSWORD" "$OPENKPI_ENV_FILE"
 
 _openkpi_env_upsert_kv "KUBE_DNS_IP" "$KUBE_DNS_IP" "$OPENKPI_ENV_FILE"
+
+# Portal/UI: kube-dns ClusterIP (used by nginx resolver)
+export KUBE_DNS_IP="${KUBE_DNS_IP:-10.43.0.10}"

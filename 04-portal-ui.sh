@@ -3,9 +3,9 @@ set -euo pipefail
 
 # ==============================================================================
 # 04-portal-ui.sh — Portal UI (static nginx) in namespace platform
-# - Serves HTML+JS UI at /
+# - Serves HTML+JS at /
 # - Proxies /api/* to portal-api service
-# - Unprivileged-safe nginx config (pid + temp paths under /tmp, listen 8080)
+# - Unprivileged-safe nginx (pid + temp paths under /tmp, listen 8080)
 # - Idempotent: kubectl apply; safe to re-run
 # ==============================================================================
 
@@ -22,6 +22,9 @@ INGRESS_CLASS="${INGRESS_CLASS:-nginx}"
 TLS_MODE="${TLS_MODE:-off}"
 PORTAL_HOST="${PORTAL_HOST:-portal.${APP_DOMAIN:-}}"
 
+# k3s default coredns ClusterIP is commonly 10.43.0.10; keep as overrideable bash var (not nginx envsubst)
+KUBE_DNS_IP="${KUBE_DNS_IP:-10.43.0.10}"
+
 ensure_ns "${PLATFORM_NS}"
 
 TLS_BLOCK=""
@@ -32,7 +35,7 @@ if [[ "${TLS_MODE}" != "off" ]]; then
     secretName: portal-tls"
 fi
 
-log "[04B][PORTAL-UI] Applying ConfigMap (nginx.conf + index.html)"
+log "[04B][PORTAL-UI] Apply ConfigMap (nginx.conf + index.html)"
 
 CM_YAML="$(cat <<'YAML'
 apiVersion: v1
@@ -60,6 +63,9 @@ data:
       uwsgi_temp_path       /tmp/uwsgi;
       scgi_temp_path        /tmp/scgi;
 
+      # DNS for dynamic upstream resolution (k3s CoreDNS)
+      resolver __KUBE_DNS_IP__ valid=10s ipv6=off;
+
       server {
         listen 8080;
         server_name _;
@@ -76,6 +82,7 @@ data:
           return 200 'ok';
         }
 
+        # Proxy API through the UI domain to avoid CORS
         location /api/ {
           proxy_http_version 1.1;
           proxy_set_header Host $host;
@@ -84,6 +91,8 @@ data:
           proxy_set_header X-Forwarded-Proto $scheme;
           proxy_read_timeout 30s;
           proxy_connect_timeout 5s;
+
+          # IMPORTANT: use Service name (not Pod IP) so it survives rollouts
           proxy_pass http://portal-api.__PLATFORM_NS__.svc.cluster.local/;
         }
       }
@@ -337,9 +346,10 @@ YAML
 )"
 
 CM_YAML="${CM_YAML//__PLATFORM_NS__/${PLATFORM_NS}}"
+CM_YAML="${CM_YAML//__KUBE_DNS_IP__/${KUBE_DNS_IP}}"
 apply_yaml "${CM_YAML}"
 
-log "[04B][PORTAL-UI] Applying portal-ui Deployment + Service"
+log "[04B][PORTAL-UI] Apply Deployment + Service"
 
 DS_YAML="$(cat <<'YAML'
 apiVersion: apps/v1
@@ -422,35 +432,10 @@ YAML
 DS_YAML="${DS_YAML//__PLATFORM_NS__/${PLATFORM_NS}}"
 apply_yaml "${DS_YAML}"
 
-# [PATCHES][UI]
-(
-  # Patch block is safe to re-run and does not overwrite index.html with blanks.
-  PLATFORM_NS="${PLATFORM_NS:-platform}"
+log "[04B][PORTAL-UI] Wait for readiness"
+kubectl_wait_deploy "${PLATFORM_NS}" "portal-ui" "240s"
 
-  k() { echo "+ $*"; "$@"; }
-
-  # Ensure Service port wiring is correct
-  if kubectl -n "${PLATFORM_NS}" get svc portal-ui >/dev/null 2>&1; then
-    k kubectl -n "${PLATFORM_NS}" patch svc portal-ui --type='json' -p \
-      '[{"op":"replace","path":"/spec/ports/0/port","value":80},{"op":"replace","path":"/spec/ports/0/targetPort","value":8080}]' \
-      || true
-  fi
-
-  # Force restart so configmap changes are picked up
-  if kubectl -n "${PLATFORM_NS}" get deploy portal-ui >/dev/null 2>&1; then
-    k kubectl -n "${PLATFORM_NS}" rollout restart deploy/portal-ui
-  fi
-
-  echo "[PATCHES][UI] patched: cm=portal-ui-static deploy=portal-ui svc=portal-ui"
-  k kubectl -n "${PLATFORM_NS}" get cm portal-ui-static -o wide || true
-  k kubectl -n "${PLATFORM_NS}" get deploy portal-ui -o wide || true
-  k kubectl -n "${PLATFORM_NS}" get svc portal-ui -o wide || true
-)
-
-log "[04B][PORTAL-UI] Waiting for readiness"
-kubectl_wait_deploy "${PLATFORM_NS}" "portal-ui" "180s"
-
-log "[04B][PORTAL-UI] Ensuring Ingress (host: ${PORTAL_HOST}, class: ${INGRESS_CLASS}, tls: ${TLS_MODE})"
+log "[04B][PORTAL-UI] Apply Ingress (host: ${PORTAL_HOST}, class: ${INGRESS_CLASS}, tls: ${TLS_MODE})"
 
 ING_YAML="$(cat <<'YAML'
 apiVersion: networking.k8s.io/v1
@@ -496,6 +481,34 @@ else
 fi
 
 apply_yaml "${ING_YAML}"
+
+
+# ----------------------------------------------------------------------
+# TLS Certificate (repeatable): ensures portal-tls exists, otherwise NGINX serves fake cert
+# ----------------------------------------------------------------------
+if [[ "${TLS_MODE}" == "per-host-http01" ]]; then
+  : "${PORTAL_TLS_SECRET:=portal-tls}"
+  : "${CLUSTER_ISSUER:=letsencrypt-http01}"
+
+  log "[04B][PORTAL-UI] Ensure Certificate (${PORTAL_TLS_SECRET}) via ClusterIssuer (${CLUSTER_ISSUER})"
+  kubectl -n "${PLATFORM_NS}" apply -f - <<YAML
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: portal-cert
+  namespace: ${PLATFORM_NS}
+spec:
+  secretName: ${PORTAL_TLS_SECRET}
+  issuerRef:
+    kind: ClusterIssuer
+    name: ${CLUSTER_ISSUER}
+  dnsNames:
+    - ${PORTAL_HOST}
+YAML
+
+  kubectl -n "${PLATFORM_NS}" wait --for=condition=Ready certificate/portal-cert --timeout=600s || true
+fi
+
 
 log "[04B][PORTAL-UI] Done"
 echo "Portal URL: https://${PORTAL_HOST}/"

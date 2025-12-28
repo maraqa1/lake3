@@ -17,9 +17,13 @@ set -euo pipefail
 #   03-app-dbt.sh
 #   03-app-metabase-prereqs.sh
 #   03-app-metabase.sh
-#   04-portal-api.sh
-#   04-portal-ui.sh
-#   patch-portal-repeatable.sh (optional)
+#
+#   Portal (repeatable, enforced order):
+#     04-portal-api-v2.sh
+#     04A-api-links.patch.sh
+#     04-portal-ui-v1.sh
+#     04B-ui-links.patch.sh (optional)
+#
 #   05-validate.sh
 # ==============================================================================
 
@@ -43,7 +47,8 @@ Flags:
   --metabase        Ensure prerequisites + install Metabase
                     (03-app-metabase-prereqs.sh + 03-app-metabase.sh)
 
-  --portal          Deploy portal API + UI (04-portal-api.sh + 04-portal-ui.sh)
+  --portal          Deploy portal API + patches + UI
+                    (04-portal-api-v2.sh + 04A-api-links.patch.sh + 04-portal-ui-v1.sh + optional 04B-ui-links.patch.sh)
 
   --all             Run full install (default)
   -h, --help        Show help
@@ -123,10 +128,15 @@ if [[ "$RUN_MINIO_HTTPS" -eq 1 ]]; then
   RUN_DATA=1
 fi
 
-# Metabase needs: core + data-plane (Postgres), plus its prereqs script will ensure ingress/cert-manager/issuer/secret
+# Metabase needs: core + data-plane
 if [[ "$RUN_METABASE" -eq 1 ]]; then
   RUN_CORE=1
   RUN_DATA=1
+fi
+
+# Portal expects ingress/cert-manager already handled by core modules
+if [[ "$RUN_PORTAL" -eq 1 ]]; then
+  RUN_CORE=1
 fi
 
 # Validate required module files exist
@@ -143,8 +153,6 @@ need_file "00-lib.sh"
 need_file "01-core.sh"
 need_file "02-data-plane.sh"
 need_file "02-A-minio-https.sh"
-need_file "04-portal-api.sh"
-need_file "04-portal-ui.sh"
 need_file "05-validate.sh"
 
 if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
@@ -159,6 +167,14 @@ if [[ "$RUN_METABASE" -eq 1 ]]; then
   need_file "03-app-metabase.sh"
 fi
 
+# Portal files (v2 API + patches + v1 UI)
+if [[ "$RUN_PORTAL" -eq 1 ]]; then
+  need_file "04-portal-api-v2.sh"
+  need_file "04A-api-links.patch.sh"
+  need_file "04-portal-ui-v1.sh"
+  # 04B-ui-links.patch.sh is optional (only if present)
+fi
+
 # Source contract/env (must be source-only per contract)
 # shellcheck disable=SC1091
 . "$HERE/00-env.sh"
@@ -169,6 +185,7 @@ echo "[INSTALL] APP_DOMAIN=${APP_DOMAIN:-}"
 echo "[INSTALL] TLS_MODE=${TLS_MODE:-}"
 echo "[INSTALL] INGRESS_CLASS=${INGRESS_CLASS:-}"
 echo "[INSTALL] STORAGE_CLASS=${STORAGE_CLASS:-}"
+echo "[INSTALL] PORTAL_HOST=${PORTAL_HOST:-}"
 
 run_step() {
   local name="$1"
@@ -221,19 +238,30 @@ if [[ "$RUN_METABASE" -eq 1 ]]; then
   run_step "metabase" "03-app-metabase.sh"
 fi
 
-# Portal (API + UI)
+# Portal (API v2 -> patch -> UI v1 -> optional patch)  [repeatable]
 if [[ "$RUN_PORTAL" -eq 1 ]]; then
-  run_step "portal-api" "04-portal-api.sh"
-  run_step "portal-ui" "04-portal-ui.sh"
-fi
+  run_step "portal-api-v2" "04-portal-api-v2.sh"
+  echo "[INSTALL][PORTAL] wait portal-api rollout"
+  kubectl -n platform rollout status deployment portal-api --timeout=240s
 
-# Optional repeatable portal patch
-PATCH_PORTAL="${HERE}/patch-portal-repeatable.sh"
-if [[ -x "${PATCH_PORTAL}" ]]; then
-  echo "[PATCH][PORTAL] Running repeatable portal patch"
-  "${PATCH_PORTAL}"
-else
-  echo "[PATCH][PORTAL] patch-portal-repeatable.sh not found or not executable; skipping"
+  run_step "portal-api-links-patch" "04A-api-links.patch.sh" || true
+
+  run_step "portal-ui-v1" "04-portal-ui-v1.sh"
+  echo "[INSTALL][PORTAL] wait portal-ui rollout"
+  kubectl -n platform rollout status deployment portal-ui --timeout=240s
+
+  if [[ -f "${HERE}/04B-ui-links.patch.sh" ]]; then
+    run_step "portal-ui-links-patch" "04B-ui-links.patch.sh" || true
+  else
+    echo "[INSTALL][PORTAL] 04B-ui-links.patch.sh not present; skipping"
+  fi
+
+  echo "[INSTALL][PORTAL] quick checks (no jq)"
+  if [[ -n "${PORTAL_HOST:-}" ]]; then
+    curl -sk "https://${PORTAL_HOST}/api/summary?v=1" | head -c 300; echo
+    curl -skI "https://${PORTAL_HOST}/app.js" | tr -d '\r' | egrep -i 'HTTP/|content-type:' || true
+    curl -skI "https://${PORTAL_HOST}/styles.css" | tr -d '\r' | egrep -i 'HTTP/|content-type:' || true
+  fi
 fi
 
 # Validation always runs

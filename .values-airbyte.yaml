@@ -1,0 +1,42 @@
+global:
+  deploymentMode: oss
+
+webapp:
+  ingress:
+    enabled: false
+
+server:
+  extraEnvFrom:
+    - configMapRef:
+        name: airbyte-s3-config
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: "openkpi-minio-secret"
+          key: "MINIO_ROOT_USER"
+          optional: false
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: "openkpi-minio-secret"
+          key: "MINIO_ROOT_PASSWORD"
+          optional: false
+
+worker:
+  extraEnvFrom:
+    - configMapRef:
+        name: airbyte-s3-config
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: "openkpi-minio-secret"
+          key: "MINIO_ROOT_USER"
+          optional: false
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: "openkpi-minio-secret"
+          key: "MINIO_ROOT_PASSWORD"
+          optional: false

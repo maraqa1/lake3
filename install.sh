@@ -13,7 +13,7 @@ set -euo pipefail
 #   03-app-airbyte.sh
 #   03A-airbyte-minio-docstore-fix.sh
 #   03-app-n8n.sh
-#   03-app-zammad.sh
+#   03-app-zammad.sh          (now includes TLS/ingress enforcement; no 03C fix)
 #   03-app-dbt.sh
 #   03-app-metabase-prereqs.sh
 #   03-app-metabase.sh
@@ -23,6 +23,7 @@ set -euo pipefail
 #     04A-api-links.patch.sh
 #     04-portal-ui-v1.sh
 #     04B-ui-links.patch.sh (optional)
+#     04C-ui-rollout-reset.patch.sh (optional; applied automatically if present)
 #
 #   05-validate.sh
 # ==============================================================================
@@ -47,8 +48,9 @@ Flags:
   --metabase        Ensure prerequisites + install Metabase
                     (03-app-metabase-prereqs.sh + 03-app-metabase.sh)
 
-  --portal          Deploy portal API + patches + UI
-                    (04-portal-api-v2.sh + 04A-api-links.patch.sh + 04-portal-ui-v1.sh + optional 04B-ui-links.patch.sh)
+  --portal          Deploy portal API + patches + UI (+ optional rollout reset)
+                    (04-portal-api-v2.sh + 04A-api-links.patch.sh + 04-portal-ui-v1.sh
+                     + optional 04B-ui-links.patch.sh + optional 04C-ui-rollout-reset.patch.sh)
 
   --all             Run full install (default)
   -h, --help        Show help
@@ -128,6 +130,22 @@ if [[ "$RUN_MINIO_HTTPS" -eq 1 ]]; then
   RUN_DATA=1
 fi
 
+# n8n needs shared Postgres (data-plane)
+if [[ "$RUN_N8N" -eq 1 ]]; then
+  RUN_DATA=1
+fi
+
+# Zammad needs shared storage + ingress (core at least; data-plane recommended)
+if [[ "$RUN_ZAMMAD" -eq 1 ]]; then
+  RUN_CORE=1
+  RUN_DATA=1
+fi
+
+# dbt runner needs shared Postgres/MinIO (data-plane)
+if [[ "$RUN_DBT" -eq 1 ]]; then
+  RUN_DATA=1
+fi
+
 # Metabase needs: core + data-plane
 if [[ "$RUN_METABASE" -eq 1 ]]; then
   RUN_CORE=1
@@ -172,7 +190,8 @@ if [[ "$RUN_PORTAL" -eq 1 ]]; then
   need_file "04-portal-api-v2.sh"
   need_file "04A-api-links.patch.sh"
   need_file "04-portal-ui-v1.sh"
-  # 04B-ui-links.patch.sh is optional (only if present)
+  # 04B-ui-links.patch.sh is optional
+  # 04C-ui-rollout-reset.patch.sh is optional
 fi
 
 # Source contract/env (must be source-only per contract)
@@ -238,7 +257,7 @@ if [[ "$RUN_METABASE" -eq 1 ]]; then
   run_step "metabase" "03-app-metabase.sh"
 fi
 
-# Portal (API v2 -> patch -> UI v1 -> optional patch)  [repeatable]
+# Portal (API v2 -> patch -> UI v1 -> optional patches) [repeatable]
 if [[ "$RUN_PORTAL" -eq 1 ]]; then
   run_step "portal-api-v2" "04-portal-api-v2.sh"
   echo "[INSTALL][PORTAL] wait portal-api rollout"
@@ -249,6 +268,14 @@ if [[ "$RUN_PORTAL" -eq 1 ]]; then
   run_step "portal-ui-v1" "04-portal-ui-v1.sh"
   echo "[INSTALL][PORTAL] wait portal-ui rollout"
   kubectl -n platform rollout status deployment portal-ui --timeout=240s
+
+  if [[ -f "${HERE}/04C-ui-rollout-reset.patch.sh" ]]; then
+    run_step "portal-ui-rollout-reset" "04C-ui-rollout-reset.patch.sh" || true
+    echo "[INSTALL][PORTAL] wait portal-ui rollout (post reset)"
+    kubectl -n platform rollout status deployment portal-ui --timeout=240s
+  else
+    echo "[INSTALL][PORTAL] 04C-ui-rollout-reset.patch.sh not present; skipping"
+  fi
 
   if [[ -f "${HERE}/04B-ui-links.patch.sh" ]]; then
     run_step "portal-ui-links-patch" "04B-ui-links.patch.sh" || true

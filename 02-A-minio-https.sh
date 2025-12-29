@@ -171,4 +171,4 @@ echo | openssl s_client -connect "${MINIO_CONSOLE_HOST}:443" -servername "${MINI
 hr
 echo "MinIO Console: https://${MINIO_CONSOLE_HOST}/"
 echo "MinIO S3:      https://${MINIO_S3_HOST}/"
-SH
+

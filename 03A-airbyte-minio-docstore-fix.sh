@@ -85,6 +85,32 @@ log "6) Wait for readiness"
 kubectl -n "${AB_NS}" rollout status deploy/airbyte-server --timeout=300s >/dev/null
 kubectl -n "${AB_NS}" rollout status deploy/airbyte-worker --timeout=300s >/dev/null
 
+# ------------------------------------------------------------------------------
+# 6A) Compatibility Service for Portal API (repeatable)
+# Portal expects: airbyte namespace service name = "airbyte-server"
+# Helm chart creates: "airbyte-airbyte-server-svc"
+# This alias points to the same server pods on port 8001.
+# ------------------------------------------------------------------------------
+log "6A) Ensure compatibility Service: airbyte-server (for portal API)"
+
+kubectl -n "${AB_NS}" apply -f - <<'YAML'
+apiVersion: v1
+kind: Service
+metadata:
+  name: airbyte-server
+  namespace: airbyte
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: airbyte
+    app.kubernetes.io/name: server
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+YAML
+
+
 log "7) Proof: alias DNS + MinIO health through alias"
 SUF="$(date +%s)-$RANDOM"
 kubectl -n "${AB_NS}" run -i --rm --restart=Never "dns-proof-${SUF}" \

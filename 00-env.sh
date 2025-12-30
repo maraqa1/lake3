@@ -16,8 +16,8 @@ set -euo pipefail
 OPENKPI_ENV_FILE="${OPENKPI_ENV_FILE:-/root/open-kpi.env}"
 umask 077
 
-DOMAIN_BASE=lake3.opendatalake.com
-APP_DOMAIN=portal.lake3.opendatalake.com
+DOMAIN_BASE=lake1.opendatalake.com
+APP_DOMAIN=portal.lake1.opendatalake.com
 
 TLS_MODE=per-host-http01
 INGRESS_CLASS=nginx

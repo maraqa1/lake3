@@ -2,19 +2,16 @@
 set -euo pipefail
 
 # ==============================================================================
-# 04-portal-api-v2.sh — OpenKPI Portal API (Flask)
-# - Namespace: platform (default)
-# - Endpoints: /api/health, /api/catalog, /api/ingestion, /api/summary
-# - Repeatable / idempotent
+# 04X-api-appstate.patch.sh — Portal API: emit explicit app states in /api/summary
 #
-# Production notes (explicit):
-# - Supports BOTH Postgres secret schemas:
-#     A) POSTGRES_DB / POSTGRES_USER / POSTGRES_PASSWORD (common chart style)
-#     B) db / username / password / host / port            (your current style)
-# - Supports BOTH MinIO secret schemas:
-#     A) MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
-#     B) rootUser / rootPassword (some charts), or accesskey/secretkey
-# - Does NOT assume jq installed.
+# Adds summary.apps[] with: healthy | degraded | down | not_installed
+# - Core apps: platform, minio
+# - Optional apps: airbyte, dbt, metabase, n8n, zammad
+#
+# Repeatable on a fresh VM:
+# - Re-applies ConfigMap portal-api-code (only app.py changed)
+# - Rollout-restarts portal-api
+# - Runs minimal tests (no jq dependency)
 # ==============================================================================
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,139 +21,25 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "${HERE}/00-lib.sh"
 
 require_cmd kubectl
+require_cmd python3
+require_cmd curl
 
 PLATFORM_NS="${PLATFORM_NS:-platform}"
 OPENKPI_NS="${NS:-open-kpi}"
 
-: "${INGRESS_CLASS:=nginx}"
-: "${TLS_MODE:=per-host-http01}"     # off | per-host-http01
+API_CM="${PORTAL_API_CM:-portal-api-code}"
+API_DEPLOY="${PORTAL_API_DEPLOY:-portal-api}"
+
 : "${PORTAL_HOST:=${PORTAL_HOST:-}}"
-[[ -n "${PORTAL_HOST}" ]] || fatal "PORTAL_HOST not set. Define PORTAL_HOST (or BASE_DOMAIN+LAKE_ID derivation) in /root/open-kpi.env"
+[[ -n "${PORTAL_HOST}" ]] || fatal "PORTAL_HOST not set in /root/open-kpi.env"
 
-
-API_NAME="portal-api"
-API_SA="portal-api-sa"
-API_CM="portal-api-code"
-API_SECRET="portal-api-secrets"
-API_DEPLOY="${API_NAME}"
-API_SVC="${API_NAME}"
-
-MINIO_SECRET_SRC="${MINIO_SECRET_SRC:-openkpi-minio-secret}"
-PG_SECRET_SRC="${PG_SECRET_SRC:-openkpi-postgres-secret}"
-
-# Defaults if secret doesn't provide host/port (internal cluster DNS)
-MINIO_ENDPOINT_INTERNAL_DEFAULT="http://openkpi-minio.${OPENKPI_NS}.svc.cluster.local:9000"
-PG_HOST_INTERNAL_DEFAULT="openkpi-postgres.${OPENKPI_NS}.svc.cluster.local"
-PG_PORT_INTERNAL_DEFAULT="5432"
+log(){ echo "[04X][PORTAL-API][APPSTATE] $*"; }
+warn(){ echo "[04X][PORTAL-API][APPSTATE][WARN] $*" >&2; }
 
 ensure_ns "${PLATFORM_NS}"
 
-b64dec() { printf '%s' "$1" | base64 -d 2>/dev/null || true; }
-
-get_secret_key_b64() {
-  local ns="$1" secret="$2" key="$3"
-  kubectl -n "${ns}" get secret "${secret}" -o "jsonpath={.data.${key}}" 2>/dev/null || true
-}
-
-# Return first non-empty secret key value (base64), from a list of keys.
-# Usage: get_secret_first_b64 <ns> <secret> <key1> <key2> ...
-get_secret_first_b64() {
-  local ns="$1" secret="$2"; shift 2
-  local key val
-  for key in "$@"; do
-    val="$(get_secret_key_b64 "$ns" "$secret" "$key")"
-    if [[ -n "${val}" ]]; then
-      printf '%s' "${val}"
-      return 0
-    fi
-  done
-  return 0
-}
-
-# Return decoded secret value, trying multiple keys.
-# Usage: get_secret_first_dec <ns> <secret> <key1> <key2> ...
-get_secret_first_dec() {
-  local ns="$1" secret="$2"; shift 2
-  b64dec "$(get_secret_first_b64 "$ns" "$secret" "$@")"
-}
-
-# ------------------------------------------------------------------------------
-# Read MinIO credentials (support multiple secret key styles)
-# ------------------------------------------------------------------------------
-MINIO_ROOT_USER="$(get_secret_first_dec "${OPENKPI_NS}" "${MINIO_SECRET_SRC}" \
-  "MINIO_ROOT_USER" "rootUser" "accesskey" "AWS_ACCESS_KEY_ID" "S3_ACCESS_KEY" "s3-access-key-id")"
-
-MINIO_ROOT_PASSWORD="$(get_secret_first_dec "${OPENKPI_NS}" "${MINIO_SECRET_SRC}" \
-  "MINIO_ROOT_PASSWORD" "rootPassword" "secretkey" "AWS_SECRET_ACCESS_KEY" "S3_SECRET_KEY" "s3-secret-access-key")"
-
-MINIO_ENDPOINT_SECRET="$(get_secret_first_dec "${OPENKPI_NS}" "${MINIO_SECRET_SRC}" \
-  "MINIO_ENDPOINT" "S3_ENDPOINT" "endpoint")"
-
-MINIO_ENDPOINT_INTERNAL="${MINIO_ENDPOINT_INTERNAL:-${MINIO_ENDPOINT_SECRET:-${MINIO_ENDPOINT_INTERNAL_DEFAULT}}}"
-
-: "${MINIO_ROOT_USER:=}"
-: "${MINIO_ROOT_PASSWORD:=}"
-
-# ------------------------------------------------------------------------------
-# Read Postgres connection info (support multiple secret schemas)
-# Your current openkpi-postgres-secret keys: db/username/password/host/port
-# ------------------------------------------------------------------------------
-PG_DB="$(get_secret_first_dec "${OPENKPI_NS}" "${PG_SECRET_SRC}" "POSTGRES_DB" "db")"
-PG_USER="$(get_secret_first_dec "${OPENKPI_NS}" "${PG_SECRET_SRC}" "POSTGRES_USER" "username")"
-PG_PASSWORD="$(get_secret_first_dec "${OPENKPI_NS}" "${PG_SECRET_SRC}" "POSTGRES_PASSWORD" "password")"
-
-PG_HOST_SECRET="$(get_secret_first_dec "${OPENKPI_NS}" "${PG_SECRET_SRC}" "PG_HOST" "POSTGRES_HOST" "host")"
-PG_PORT_SECRET="$(get_secret_first_dec "${OPENKPI_NS}" "${PG_SECRET_SRC}" "PG_PORT" "POSTGRES_PORT" "port")"
-
-PG_HOST_INTERNAL="${PG_HOST_INTERNAL:-${PG_HOST_SECRET:-${PG_HOST_INTERNAL_DEFAULT}}}"
-PG_PORT_INTERNAL="${PG_PORT_INTERNAL:-${PG_PORT_SECRET:-${PG_PORT_INTERNAL_DEFAULT}}}"
-
-: "${PG_DB:=postgres}"
-: "${PG_USER:=postgres}"
-: "${PG_PASSWORD:=}"
-
-[[ -n "${PG_PASSWORD}" ]] || fatal "missing Postgres password in ${OPENKPI_NS}/${PG_SECRET_SRC} (expected POSTGRES_PASSWORD or password)"
-[[ -n "${PG_HOST_INTERNAL}" ]] || fatal "missing Postgres host (secret host/POSTGRES_HOST/PG_HOST or internal default)"
-[[ -n "${PG_PORT_INTERNAL}" ]] || fatal "missing Postgres port (secret port/POSTGRES_PORT/PG_PORT or internal default)"
-
-# MinIO can be optional; portal should still come up without it, but mark unavailable.
-# Do not fatal on MinIO empties.
-if [[ -z "${MINIO_ROOT_USER}" || -z "${MINIO_ROOT_PASSWORD}" ]]; then
-  warn "MinIO credentials not found in ${OPENKPI_NS}/${MINIO_SECRET_SRC}; MinIO catalog will report unavailable"
-fi
-
-# ------------------------------------------------------------------------------
-# API runtime config secret (platform namespace)
-# ------------------------------------------------------------------------------
-apply_yaml "$(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ${API_SECRET}
-  namespace: ${PLATFORM_NS}
-type: Opaque
-stringData:
-  TLS_MODE: "${TLS_MODE}"
-  PORTAL_HOST: "${PORTAL_HOST}"
-  INGRESS_CLASS: "${INGRESS_CLASS}"
-  OPENKPI_NS: "${OPENKPI_NS}"
-
-  MINIO_ENDPOINT: "${MINIO_ENDPOINT_INTERNAL}"
-  MINIO_ACCESS_KEY: "${MINIO_ROOT_USER}"
-  MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD}"
-
-  PG_HOST: "${PG_HOST_INTERNAL}"
-  PG_PORT: "${PG_PORT_INTERNAL}"
-  PG_DB: "${PG_DB}"
-  PG_USER: "${PG_USER}"
-  PG_PASSWORD: "${PG_PASSWORD}"
-EOF
-)"
-
-# ------------------------------------------------------------------------------
-# API code + requirements ConfigMap
-# ------------------------------------------------------------------------------
-apply_yaml "$(cat <<'EOF'
+log "Patch ConfigMap ${PLATFORM_NS}/${API_CM} (inject apps[] state model)"
+kubectl -n "${PLATFORM_NS}" apply -f - <<'YAML'
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -165,7 +48,7 @@ metadata:
 data:
   app.py: |
     import os, datetime
-    from typing import Dict, Any, Optional
+    from typing import Dict, Any, Optional, List
 
     from flask import Flask, jsonify, request
 
@@ -274,7 +157,7 @@ data:
       if k8s is None:
         return {"available": False, "error": "kubernetes client unavailable"}
       v1 = k8s.CoreV1Api()
-      apps = k8s.AppsV1Api()
+      apps_api = k8s.AppsV1Api()
 
       try:
         nss = [n.metadata.name for n in v1.list_namespace().items]
@@ -285,8 +168,8 @@ data:
       for ns in sorted(nss):
         try:
           pods = summarize_pods(v1, ns)
-          deps = summarize_deployments(apps, ns)
-          stss = summarize_statefulsets(apps, ns)
+          deps = summarize_deployments(apps_api, ns)
+          stss = summarize_statefulsets(apps_api, ns)
           namespaces.append({"name": ns, "pods": pods, "deployments": deps, "statefulsets": stss})
         except Exception as e:
           namespaces.append({
@@ -325,8 +208,7 @@ data:
         return None
 
     def build_links() -> Dict[str, str]:
-      # Output contract: always include keys; value "" means not available.
-      out = {"portal":"", "airbyte":"", "minio":"", "metabase":"", "n8n":"", "zammad":""}
+      out = {"portal":"", "airbyte":"", "minio":"", "metabase":"", "n8n":"", "zammad":"", "dbt":""}
 
       tls_mode = (env("TLS_MODE","off") or "off").strip()
       scheme = "https" if tls_mode == "per-host-http01" else "http"
@@ -340,14 +222,15 @@ data:
         return out
 
       net = k8s.NetworkingV1Api()
+      openkpi_ns = env("OPENKPI_NS","open-kpi")
 
-      # Preferred ingress names (stack conventions)
       candidates = {
         "airbyte":  [("airbyte","airbyte")],
         "metabase": [("analytics","metabase"), ("metabase","metabase")],
         "n8n":      [("n8n","n8n")],
         "zammad":   [("tickets","zammad")],
-        "minio":    [(env("OPENKPI_NS","open-kpi"),"minio"), (env("OPENKPI_NS","open-kpi"),"openkpi-minio")]
+        "dbt":      [("transform","dbt"), ("transform","dbt-docs"), ("transform","dbt-ui")],
+        "minio":    [(openkpi_ns,"minio"), (openkpi_ns,"openkpi-minio")]
       }
 
       for key, tries in candidates.items():
@@ -503,6 +386,104 @@ data:
         return {"available": True, "last_sync": None, "detail": {"ok": False, "error": str(e)}}
 
     # -----------------------------
+    # Apps state model (core vs optional)
+    # -----------------------------
+    def ns_by_name(k8s_namespaces: List[Dict[str, Any]], name: str) -> Optional[Dict[str, Any]]:
+      for ns in k8s_namespaces:
+        if (ns.get("name") or "") == name:
+          return ns
+      return None
+
+    def pods_ready_count(ns: Dict[str, Any]) -> int:
+      pods = (ns.get("pods") or {}).get("items") or []
+      return sum(1 for p in pods if p.get("ready") is True)
+
+    def pods_total_count(ns: Dict[str, Any]) -> int:
+      return int((ns.get("pods") or {}).get("count") or 0)
+
+    def restarts_total(ns: Dict[str, Any]) -> int:
+      return int((ns.get("pods") or {}).get("total_restarts") or 0)
+
+    def workloads_exist(ns: Dict[str, Any]) -> bool:
+      deps = int((ns.get("deployments") or {}).get("count") or 0)
+      stss = int((ns.get("statefulsets") or {}).get("count") or 0)
+      pods = pods_total_count(ns)
+      return (deps + stss + pods) > 0
+
+    def workloads_degraded(ns: Dict[str, Any]) -> bool:
+      deps = (ns.get("deployments") or {}).get("items") or []
+      stss = (ns.get("statefulsets") or {}).get("items") or []
+      for d in deps:
+        if int(d.get("ready") or 0) < int(d.get("replicas") or 0):
+          return True
+      for s in stss:
+        if int(s.get("ready") or 0) < int(s.get("replicas") or 0):
+          return True
+      # pods can exist without being ready
+      if pods_total_count(ns) > 0 and pods_ready_count(ns) < pods_total_count(ns):
+        return True
+      return False
+
+    def compute_app_status(k8s_namespaces: List[Dict[str, Any]], ns_candidates: List[str], optional: bool) -> Dict[str, Any]:
+      ns_obj = None
+      chosen = ""
+      for n in ns_candidates:
+        ns_obj = ns_by_name(k8s_namespaces, n)
+        if ns_obj is not None:
+          chosen = n
+          break
+
+      if ns_obj is None:
+        return {"status": ("not_installed" if optional else "down"), "reason": "namespace not found", "k8s": {"namespace": ns_candidates[0] if ns_candidates else ""}}
+
+      if not workloads_exist(ns_obj):
+        return {"status": ("not_installed" if optional else "down"), "reason": "no workloads detected", "k8s": {"namespace": chosen}}
+
+      if workloads_degraded(ns_obj):
+        return {"status": "degraded", "reason": "pods not fully ready / rollouts in progress", "k8s": {"namespace": chosen}}
+
+      return {"status": "healthy", "reason": "OK", "k8s": {"namespace": chosen}}
+
+    def build_apps(k8s_block: Dict[str, Any], links: Dict[str, str]) -> List[Dict[str, Any]]:
+      nss = (k8s_block.get("namespaces") or []) if k8s_block.get("available") else []
+
+      openkpi_ns = env("OPENKPI_NS","open-kpi")
+
+      defs = [
+        # core
+        {"id":"platform", "display":"Platform Operations", "category":"core", "optional": False, "ns":[env("PLATFORM_NS","platform"), "platform"], "open": links.get("portal","")},
+        {"id":"minio", "display":"Object Storage", "category":"core", "optional": False, "ns":[openkpi_ns], "open": links.get("minio","")},
+
+        # optional apps
+        {"id":"metabase", "display":"Analytics & BI", "category":"apps", "optional": True, "ns":["metabase","analytics",openkpi_ns], "open": links.get("metabase","")},
+        {"id":"n8n", "display":"Workflow Automation", "category":"apps", "optional": True, "ns":["n8n"], "open": links.get("n8n","")},
+        {"id":"zammad", "display":"ITSM / Ticketing", "category":"apps", "optional": True, "ns":["tickets"], "open": links.get("zammad","")},
+        {"id":"airbyte", "display":"Data Ingestion", "category":"apps", "optional": True, "ns":["airbyte"], "open": links.get("airbyte","")},
+        {"id":"dbt", "display":"Data Transformation", "category":"apps", "optional": True, "ns":["transform"], "open": links.get("dbt","")},
+      ]
+
+      apps_out = []
+      for d in defs:
+        s = compute_app_status(nss, d["ns"], bool(d["optional"]))
+        nsname = (s.get("k8s") or {}).get("namespace") or (d["ns"][0] if d["ns"] else "")
+        ns_obj = ns_by_name(nss, nsname) if nsname else None
+
+        pods_total = pods_total_count(ns_obj) if ns_obj else 0
+        pods_ready = pods_ready_count(ns_obj) if ns_obj else 0
+        restarts = restarts_total(ns_obj) if ns_obj else 0
+
+        apps_out.append({
+          "id": d["id"],
+          "display": d["display"],
+          "category": d["category"],
+          "status": s.get("status","degraded"),
+          "reason": s.get("reason",""),
+          "k8s": {"namespace": nsname, "pods_total": pods_total, "pods_ready": pods_ready, "restarts_24h": restarts},
+          "links": {"open": d.get("open","")}
+        })
+      return apps_out
+
+    # -----------------------------
     # Summary contract
     # -----------------------------
     def build_summary() -> Dict[str, Any]:
@@ -511,10 +492,12 @@ data:
       mn = minio_catalog()
       ing = airbyte_ingestion()
       links = build_links()
+      apps = build_apps({"available": bool(k8s.get("available")), "namespaces": (k8s.get("namespaces") or [])}, links)
 
       return {
-        "meta": {"generated_at": now_iso(), "version": "1.1"},
+        "meta": {"generated_at": now_iso(), "version": "1.2"},
         "links": links,
+        "apps": apps,
         "k8s": {"available": bool(k8s.get("available")), "namespaces": (k8s.get("namespaces") or []) if k8s.get("available") else []},
         "catalog": {
           "postgres": {"available": bool(pg.get("available")), "schemas": pg.get("schemas") or [], "tables": pg.get("tables") or [], "error": pg.get("error","")},
@@ -530,12 +513,12 @@ data:
     @app.get("/api/catalog")
     def api_catalog():
       s = build_summary()
-      return jsonify({"catalog": s["catalog"], "meta": s["meta"], "links": s["links"]})
+      return jsonify({"catalog": s["catalog"], "meta": s["meta"], "links": s["links"], "apps": s["apps"]})
 
     @app.get("/api/ingestion")
     def api_ingestion():
       s = build_summary()
-      return jsonify({"ingestion": s["ingestion"], "meta": s["meta"], "links": s["links"]})
+      return jsonify({"ingestion": s["ingestion"], "meta": s["meta"], "links": s["links"], "apps": s["apps"]})
 
     @app.get("/api/summary")
     def api_summary():
@@ -553,157 +536,42 @@ data:
     botocore==1.34.162
     psycopg2-binary==2.9.9
     requests==2.32.3
-EOF
-)"
+YAML
 
-# NOTE: ConfigMap above is hardcoded to namespace/name for safety with heredoc quoting.
-# Ensure we applied to correct namespace/name by patching if needed.
-kubectl -n "${PLATFORM_NS}" get cm "${API_CM}" >/dev/null 2>&1 || fatal "ConfigMap ${PLATFORM_NS}/${API_CM} missing after apply"
+log "Restart API deployment to pick up new ConfigMap"
+kubectl -n "${PLATFORM_NS}" rollout restart "deployment/${API_DEPLOY}"
+kubectl -n "${PLATFORM_NS}" rollout status "deployment/${API_DEPLOY}" --timeout=240s
 
-# ------------------------------------------------------------------------------
-# RBAC (cluster-wide read for portal health aggregation)
-# ------------------------------------------------------------------------------
-apply_yaml "$(cat <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ${API_SA}
-  namespace: ${PLATFORM_NS}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: ${API_NAME}-cr
-rules:
-  - apiGroups: [""]
-    resources: ["namespaces","pods","services","endpoints"]
-    verbs: ["get","list","watch"]
-  - apiGroups: ["apps"]
-    resources: ["deployments","statefulsets","replicasets"]
-    verbs: ["get","list","watch"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get","list","watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: ${API_NAME}-crb
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: ${API_NAME}-cr
-subjects:
-  - kind: ServiceAccount
-    name: ${API_SA}
-    namespace: ${PLATFORM_NS}
-EOF
-)"
+log "TEST 1: /api/health"
+curl -sk "https://${PORTAL_HOST}/api/health" | python3 - <<'PY'
+import json,sys
+d=json.load(sys.stdin)
+assert d.get("ok") is True
+print("OK")
+PY
 
-# ------------------------------------------------------------------------------
-# Deployment + Service
-# ------------------------------------------------------------------------------
-apply_yaml "$(cat <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${API_DEPLOY}
-  namespace: ${PLATFORM_NS}
-  labels:
-    app: ${API_NAME}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ${API_NAME}
-  template:
-    metadata:
-      labels:
-        app: ${API_NAME}
-    spec:
-      serviceAccountName: ${API_SA}
-      securityContext:
-        fsGroup: 1000
-      volumes:
-        - name: code
-          configMap:
-            name: ${API_CM}
-        - name: work
-          emptyDir: {}
-      containers:
-        - name: ${API_NAME}
-          image: python:3.12-slim
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            runAsUser: 1000
-            runAsGroup: 1000
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
-          envFrom:
-            - secretRef:
-                name: ${API_SECRET}
-          env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
-          ports:
-            - name: http
-              containerPort: 8080
-          volumeMounts:
-            - name: code
-              mountPath: /app
-              readOnly: true
-            - name: work
-              mountPath: /work
-          command: ["/bin/sh","-lc"]
-          args:
-            - |
-              set -euo pipefail
-              python -m venv /work/venv
-              . /work/venv/bin/activate
-              pip install --no-cache-dir -r /app/requirements.txt
-              exec gunicorn -w 2 -k gthread -t 30 -b 0.0.0.0:8080 --chdir /app app:app
-          readinessProbe:
-            httpGet:
-              path: /api/health
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 2
-            failureThreshold: 6
-          livenessProbe:
-            httpGet:
-              path: /api/health
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 20
-            timeoutSeconds: 2
-            failureThreshold: 6
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${API_SVC}
-  namespace: ${PLATFORM_NS}
-  labels:
-    app: ${API_NAME}
-spec:
-  selector:
-    app: ${API_NAME}
-  ports:
-    - name: http
-      port: 80
-      targetPort: 8080
-  type: ClusterIP
-EOF
-)"
+log "TEST 2: /api/summary includes apps[] with expected ids + statuses"
+curl -sk "https://${PORTAL_HOST}/api/summary?v=1" | python3 - <<'PY'
+import json,sys
+d=json.load(sys.stdin)
+apps=d.get("apps") or []
+ids=set(a.get("id") for a in apps)
+need={"platform","minio","metabase","n8n","zammad","airbyte","dbt"}
+missing=need-ids
+assert not missing, f"missing app ids: {sorted(missing)}"
+allowed={"healthy","degraded","down","not_installed"}
+bad=[(a.get("id"),a.get("status")) for a in apps if a.get("status") not in allowed]
+assert not bad, f"bad statuses: {bad}"
+print("OK")
+PY
 
-# API does NOT own the portal ingress. UI owns / + /api routing.
-kubectl_wait_deploy "${PLATFORM_NS}" "${API_DEPLOY}" "240s"
-log "[04A][PORTAL-API] Ready: https://${PORTAL_HOST}/api/summary?v=1"
+log "TEST 3: show compact app table"
+curl -sk "https://${PORTAL_HOST}/api/summary?v=1" | python3 - <<'PY'
+import json,sys
+d=json.load(sys.stdin)
+apps=d.get("apps") or []
+for a in apps:
+  print(f'{a.get("id"):9} {a.get("status"):13} {a.get("k8s",{}).get("namespace",""):10} {a.get("reason","")}')
+PY
+
+log "Done"

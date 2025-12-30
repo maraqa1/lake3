@@ -51,7 +51,7 @@ CHART="zammad/zammad"
 : "${ZAMMAD_DB_NAME:=zammad}"
 : "${ZAMMAD_DB_USER:=zammad}"
 
-: "${LETSENCRYPT_ISSUER:=letsencrypt-prod}"      # per-host-http01 ClusterIssuer name
+: "${LETSENCRYPT_ISSUER:=letsencrypt-http01}"      # per-host-http01 ClusterIssuer name
 : "${VM_MAX_MAP_COUNT:=262144}"
 
 require_cmd kubectl
@@ -267,7 +267,6 @@ helm upgrade --install "${REL}" "${CHART}" \
 #      - Certificate points to ClusterIssuer letsencrypt-prod (missing) while cluster has letsencrypt-http01
 # ------------------------------------------------------------------------------
 if [[ "${TLS_MODE:-}" == "per-host-http01" ]]; then
-  : "${LETSENCRYPT_ISSUER:=letsencrypt-http01}"
   : "${INGRESS_CLASS:=nginx}"
 
   # Use the namespace already in use by the script (APP_NS), do not overwrite it.

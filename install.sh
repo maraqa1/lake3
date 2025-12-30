@@ -2,296 +2,192 @@
 set -euo pipefail
 
 # ==============================================================================
-# Open KPI — top-level installer orchestrator (GitHub runner)
-# File: install.sh
-# ==============================================================================
-# Order enforced:
-#   00-env.sh (source only)
+# OpenKPI — install.sh (orchestrator)
+# - Repeatable: safe to re-run; modules should be idempotent
+# - Uses /root/open-kpi.env via ./00-env.sh (single source of truth)
+# - Supports partial runs via flags
+#
+# Expected module files in repo root:
+#   00-env.sh
+#   00-lib.sh
 #   01-core.sh
 #   02-data-plane.sh
-#   02-A-minio-https.sh
+#   02-A-minio-https.sh              (optional; only if you use MinIO TLS)
 #   03-app-airbyte.sh
-#   03A-airbyte-minio-docstore-fix.sh
+#   03A-airbyte-minio-docstore-fix.sh (optional; if needed)
 #   03-app-n8n.sh
-#   03-app-zammad.sh          (now includes TLS/ingress enforcement; no 03C fix)
+#   03-app-zammad.sh
 #   03-app-dbt.sh
-#   03-app-metabase-prereqs.sh
-#   03-app-metabase.sh
+#   03-app-metabase-prereqs.sh       (optional; if present)
+#   03-app-metabase.sh               (optional; if present)
+#   04-run-portal-fresh.sh           (portal API + patches + UI + UI patches)
+#   05-validate.sh                   (optional; if present)
 #
-#   Portal (repeatable, enforced order):
-#     04-portal-api-v2.sh
-#     04A-api-links.patch.sh
-#     04-portal-ui-v1.sh
-#     04B-ui-links.patch.sh (optional)
-#     04C-ui-rollout-reset.patch.sh (optional; applied automatically if present)
-#
-#   05-validate.sh
 # ==============================================================================
 
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-timestamp() { date -u +"%Y%m%dT%H%M%SZ"; }
 
+# shellcheck source=/dev/null
+. "${HERE}/00-env.sh"
+# shellcheck source=/dev/null
+. "${HERE}/00-lib.sh"
+
+require_cmd bash
+require_cmd kubectl
+require_cmd curl
+require_cmd git
+
+# ------------------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------------------
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [flags]
+Usage:
+  ./install.sh [flags]
 
-Flags:
-  --core            Run core cluster setup (01-core.sh)
-  --data            Run shared data plane (02-data-plane.sh)
-  --minio-https     Run MinIO HTTPS module (02-A-minio-https.sh)
+Flags (run subsets):
+  --all             Run full install (default if no flags)
+  --core            01-core.sh
+  --data            02-data-plane.sh
+  --minio-https      02-A-minio-https.sh (if present)
+  --airbyte         03-app-airbyte.sh
+  --airbyte-fix      03A-airbyte-minio-docstore-fix.sh (if present)
+  --n8n             03-app-n8n.sh
+  --zammad          03-app-zammad.sh
+  --dbt             03-app-dbt.sh
+  --metabase        03-app-metabase-prereqs.sh (if present) + 03-app-metabase.sh (if present)
+  --portal          04-run-portal-fresh.sh
+  --validate        05-validate.sh (if present)
 
-  --airbyte         Install Airbyte (03-app-airbyte.sh) + docstore fix (03A-airbyte-minio-docstore-fix.sh)
-  --n8n             Install n8n (03-app-n8n.sh)
-  --zammad          Install Zammad (03-app-zammad.sh)
-  --dbt             Install dbt runner + cron (03-app-dbt.sh)
-
-  --metabase        Ensure prerequisites + install Metabase
-                    (03-app-metabase-prereqs.sh + 03-app-metabase.sh)
-
-  --portal          Deploy portal API + patches + UI (+ optional rollout reset)
-                    (04-portal-api-v2.sh + 04A-api-links.patch.sh + 04-portal-ui-v1.sh
-                     + optional 04B-ui-links.patch.sh + optional 04C-ui-rollout-reset.patch.sh)
-
-  --all             Run full install (default)
-  -h, --help        Show help
+Utility:
+  -h, --help        Show this help
 
 Examples:
-  ./install.sh
-  ./install.sh --core --data --minio-https --airbyte
-  ./install.sh --metabase
+  ./install.sh --all
+  ./install.sh --core --data --airbyte --portal
   ./install.sh --portal
 EOF
 }
 
-mkdir -p /var/log/open-kpi
-LOG_FILE="/var/log/open-kpi/install-$(timestamp).log"
-exec > >(tee -a "$LOG_FILE") 2>&1
-
-echo "[INSTALL] start $(timestamp)"
-echo "[INSTALL] log $LOG_FILE"
-echo "[INSTALL] cwd $HERE"
-
-# Flags
-RUN_CORE=0
-RUN_DATA=0
-RUN_MINIO_HTTPS=0
-RUN_AIRBYTE=0
-RUN_N8N=0
-RUN_ZAMMAD=0
-RUN_DBT=0
-RUN_METABASE=0
-RUN_PORTAL=0
-RUN_ALL=1
-
-if [[ $# -gt 0 ]]; then
-  RUN_ALL=0
-  while [[ $# -gt 0 ]]; do
-    case "${1:-}" in
-      --all) RUN_ALL=1 ;;
-      --core) RUN_CORE=1 ;;
-      --data) RUN_DATA=1 ;;
-      --minio-https) RUN_MINIO_HTTPS=1 ;;
-      --airbyte) RUN_AIRBYTE=1 ;;
-      --n8n) RUN_N8N=1 ;;
-      --zammad) RUN_ZAMMAD=1 ;;
-      --dbt) RUN_DBT=1 ;;
-      --metabase) RUN_METABASE=1 ;;
-      --portal) RUN_PORTAL=1 ;;
-      -h|--help) usage; exit 0 ;;
-      *)
-        echo "[INSTALL][ERR] unknown flag: $1"
-        usage
-        exit 2
-        ;;
-    esac
-    shift
-  done
-fi
-
-if [[ "$RUN_ALL" -eq 1 ]]; then
-  RUN_CORE=1
-  RUN_DATA=1
-  RUN_MINIO_HTTPS=1
-  RUN_AIRBYTE=1
-  RUN_N8N=1
-  RUN_ZAMMAD=1
-  RUN_DBT=1
-  RUN_METABASE=1
-  RUN_PORTAL=1
-fi
-
-# Dependency tightening
-if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
-  RUN_DATA=1
-  RUN_MINIO_HTTPS=1
-fi
-
-if [[ "$RUN_MINIO_HTTPS" -eq 1 ]]; then
-  RUN_DATA=1
-fi
-
-# n8n needs shared Postgres (data-plane)
-if [[ "$RUN_N8N" -eq 1 ]]; then
-  RUN_DATA=1
-fi
-
-# Zammad needs shared storage + ingress (core at least; data-plane recommended)
-if [[ "$RUN_ZAMMAD" -eq 1 ]]; then
-  RUN_CORE=1
-  RUN_DATA=1
-fi
-
-# dbt runner needs shared Postgres/MinIO (data-plane)
-if [[ "$RUN_DBT" -eq 1 ]]; then
-  RUN_DATA=1
-fi
-
-# Metabase needs: core + data-plane
-if [[ "$RUN_METABASE" -eq 1 ]]; then
-  RUN_CORE=1
-  RUN_DATA=1
-fi
-
-# Portal expects ingress/cert-manager already handled by core modules
-if [[ "$RUN_PORTAL" -eq 1 ]]; then
-  RUN_CORE=1
-fi
-
-# Validate required module files exist
-need_file() {
-  local f="$1"
-  if [[ ! -f "$HERE/$f" ]]; then
-    echo "[INSTALL][ERR] missing file: $HERE/$f"
-    exit 2
-  fi
-}
-
-need_file "00-env.sh"
-need_file "00-lib.sh"
-need_file "01-core.sh"
-need_file "02-data-plane.sh"
-need_file "02-A-minio-https.sh"
-need_file "05-validate.sh"
-
-if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
-  need_file "03-app-airbyte.sh"
-  need_file "03A-airbyte-minio-docstore-fix.sh"
-fi
-if [[ "$RUN_N8N" -eq 1 ]]; then need_file "03-app-n8n.sh"; fi
-if [[ "$RUN_ZAMMAD" -eq 1 ]]; then need_file "03-app-zammad.sh"; fi
-if [[ "$RUN_DBT" -eq 1 ]]; then need_file "03-app-dbt.sh"; fi
-if [[ "$RUN_METABASE" -eq 1 ]]; then
-  need_file "03-app-metabase-prereqs.sh"
-  need_file "03-app-metabase.sh"
-fi
-
-# Portal files (v2 API + patches + v1 UI)
-if [[ "$RUN_PORTAL" -eq 1 ]]; then
-  need_file "04-portal-api-v2.sh"
-  need_file "04A-api-links.patch.sh"
-  need_file "04-portal-ui-v1.sh"
-  # 04B-ui-links.patch.sh is optional
-  # 04C-ui-rollout-reset.patch.sh is optional
-fi
-
-# Source contract/env (must be source-only per contract)
-# shellcheck disable=SC1091
-. "$HERE/00-env.sh"
-
-echo "[INSTALL] contract loaded"
-echo "[INSTALL] NS=${NS:-}"
-echo "[INSTALL] APP_DOMAIN=${APP_DOMAIN:-}"
-echo "[INSTALL] TLS_MODE=${TLS_MODE:-}"
-echo "[INSTALL] INGRESS_CLASS=${INGRESS_CLASS:-}"
-echo "[INSTALL] STORAGE_CLASS=${STORAGE_CLASS:-}"
-echo "[INSTALL] PORTAL_HOST=${PORTAL_HOST:-}"
-
 run_step() {
   local name="$1"
-  local script="$2"
+  local file="${HERE}/$2"
 
-  echo "------------------------------------------------------------------------------"
-  echo "[INSTALL] step $name => $script"
-  echo "[INSTALL] ts $(timestamp)"
-  echo "------------------------------------------------------------------------------"
+  if [[ ! -f "$file" ]]; then
+    log "[INSTALL][$name] SKIP (missing): $2"
+    return 0
+  fi
 
-  chmod +x "$HERE/$script" || true
-  "$HERE/$script"
-
-  echo "[INSTALL] done $name"
+  log "[INSTALL][$name] RUN: $2"
+  chmod +x "$file" 2>/dev/null || true
+  bash "$file"
 }
 
-# Ordered execution
-if [[ "$RUN_CORE" -eq 1 ]]; then
-  run_step "core" "01-core.sh"
+# ------------------------------------------------------------------------------
+# Parse args
+# ------------------------------------------------------------------------------
+DO_ALL=0
+DO_CORE=0
+DO_DATA=0
+DO_MINIO_HTTPS=0
+DO_AIRBYTE=0
+DO_AIRBYTE_FIX=0
+DO_N8N=0
+DO_ZAMMAD=0
+DO_DBT=0
+DO_METABASE=0
+DO_PORTAL=0
+DO_VALIDATE=0
+
+if [[ $# -eq 0 ]]; then
+  DO_ALL=1
 fi
 
-if [[ "$RUN_DATA" -eq 1 ]]; then
-  run_step "data-plane" "02-data-plane.sh"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --all) DO_ALL=1 ;;
+    --core) DO_CORE=1 ;;
+    --data) DO_DATA=1 ;;
+    --minio-https) DO_MINIO_HTTPS=1 ;;
+    --airbyte) DO_AIRBYTE=1 ;;
+    --airbyte-fix) DO_AIRBYTE_FIX=1 ;;
+    --n8n) DO_N8N=1 ;;
+    --zammad) DO_ZAMMAD=1 ;;
+    --dbt) DO_DBT=1 ;;
+    --metabase) DO_METABASE=1 ;;
+    --portal) DO_PORTAL=1 ;;
+    --validate) DO_VALIDATE=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *)
+      echo "[FATAL] unknown flag: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [[ $DO_ALL -eq 1 ]]; then
+  DO_CORE=1
+  DO_DATA=1
+  DO_MINIO_HTTPS=1
+  DO_AIRBYTE=1
+  DO_AIRBYTE_FIX=1
+  DO_N8N=1
+  DO_ZAMMAD=1
+  DO_DBT=1
+  DO_METABASE=1
+  DO_PORTAL=1
+  DO_VALIDATE=1
 fi
 
-if [[ "$RUN_MINIO_HTTPS" -eq 1 ]]; then
+# ------------------------------------------------------------------------------
+# Pre-flight sanity: env contract
+# ------------------------------------------------------------------------------
+# 00-env.sh should load /root/open-kpi.env; enforce presence of PORTAL_HOST for portal runs.
+if [[ ! -f /root/open-kpi.env ]]; then
+  fatal "missing /root/open-kpi.env (required). Copy it to the VM before running install.sh"
+fi
+
+# If portal is requested, ensure PORTAL_HOST exists (derived or explicit).
+if [[ $DO_PORTAL -eq 1 ]]; then
+  # shellcheck source=/dev/null
+  set -a; . /root/open-kpi.env; set +a
+  [[ -n "${PORTAL_HOST:-}" ]] || fatal "PORTAL_HOST missing in /root/open-kpi.env (required for portal)"
+fi
+
+# ------------------------------------------------------------------------------
+# Execution order (dependencies)
+# ------------------------------------------------------------------------------
+# Core -> Data plane -> (optional MinIO HTTPS) -> Apps -> Portal -> Validate
+
+[[ $DO_CORE -eq 1 ]] && run_step "core" "01-core.sh"
+[[ $DO_DATA -eq 1 ]] && run_step "data-plane" "02-data-plane.sh"
+
+# Optional: MinIO TLS/Ingress hardening (only if file exists and flag enabled)
+if [[ $DO_MINIO_HTTPS -eq 1 ]]; then
   run_step "minio-https" "02-A-minio-https.sh"
 fi
 
-# Apps
-if [[ "$RUN_AIRBYTE" -eq 1 ]]; then
-  run_step "airbyte" "03-app-airbyte.sh"
-  run_step "airbyte-minio-docstore-fix" "03A-airbyte-minio-docstore-fix.sh"
-fi
+# Apps (order is safe; they should be independent but assume data-plane exists)
+[[ $DO_AIRBYTE -eq 1 ]] && run_step "airbyte" "03-app-airbyte.sh"
+[[ $DO_AIRBYTE_FIX -eq 1 ]] && run_step "airbyte-fix" "03A-airbyte-minio-docstore-fix.sh"
 
-if [[ "$RUN_N8N" -eq 1 ]]; then
-  run_step "n8n" "03-app-n8n.sh"
-fi
+[[ $DO_N8N -eq 1 ]] && run_step "n8n" "03-app-n8n.sh"
+[[ $DO_ZAMMAD -eq 1 ]] && run_step "zammad" "03-app-zammad.sh"
+[[ $DO_DBT -eq 1 ]] && run_step "dbt" "03-app-dbt.sh"
 
-if [[ "$RUN_ZAMMAD" -eq 1 ]]; then
-  run_step "zammad" "03-app-zammad.sh"
-fi
-
-if [[ "$RUN_DBT" -eq 1 ]]; then
-  run_step "dbt" "03-app-dbt.sh"
-fi
-
-if [[ "$RUN_METABASE" -eq 1 ]]; then
+if [[ $DO_METABASE -eq 1 ]]; then
   run_step "metabase-prereqs" "03-app-metabase-prereqs.sh"
   run_step "metabase" "03-app-metabase.sh"
 fi
 
-# Portal (API v2 -> patch -> UI v1 -> optional patches) [repeatable]
-if [[ "$RUN_PORTAL" -eq 1 ]]; then
-  run_step "portal-api-v2" "04-portal-api-v2.sh"
-  echo "[INSTALL][PORTAL] wait portal-api rollout"
-  kubectl -n platform rollout status deployment portal-api --timeout=240s
+# Portal (portal API + API patches + UI + UI patches) in one repeatable runner
+[[ $DO_PORTAL -eq 1 ]] && run_step "portal" "04-run-portal-fresh.sh"
 
-  run_step "portal-api-links-patch" "04A-api-links.patch.sh" || true
-
-  run_step "portal-ui-v1" "04-portal-ui-v1.sh"
-  echo "[INSTALL][PORTAL] wait portal-ui rollout"
-  kubectl -n platform rollout status deployment portal-ui --timeout=240s
-
-  if [[ -f "${HERE}/04C-ui-rollout-reset.patch.sh" ]]; then
-    run_step "portal-ui-rollout-reset" "04C-ui-rollout-reset.patch.sh" || true
-    echo "[INSTALL][PORTAL] wait portal-ui rollout (post reset)"
-    kubectl -n platform rollout status deployment portal-ui --timeout=240s
-  else
-    echo "[INSTALL][PORTAL] 04C-ui-rollout-reset.patch.sh not present; skipping"
-  fi
-
-  if [[ -f "${HERE}/04B-ui-links.patch.sh" ]]; then
-    run_step "portal-ui-links-patch" "04B-ui-links.patch.sh" || true
-  else
-    echo "[INSTALL][PORTAL] 04B-ui-links.patch.sh not present; skipping"
-  fi
-
-  echo "[INSTALL][PORTAL] quick checks (no jq)"
-  if [[ -n "${PORTAL_HOST:-}" ]]; then
-    curl -sk "https://${PORTAL_HOST}/api/summary?v=1" | head -c 300; echo
-    curl -skI "https://${PORTAL_HOST}/app.js" | tr -d '\r' | egrep -i 'HTTP/|content-type:' || true
-    curl -skI "https://${PORTAL_HOST}/styles.css" | tr -d '\r' | egrep -i 'HTTP/|content-type:' || true
-  fi
+# Validate (optional)
+if [[ $DO_VALIDATE -eq 1 ]]; then
+  run_step "validate" "05-validate.sh"
 fi
 
-# Validation always runs
-run_step "validate" "05-validate.sh"
-
-echo "[INSTALL] complete $(timestamp)"
+log "[INSTALL] done"

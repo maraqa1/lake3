@@ -28,6 +28,19 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "${HERE}/00-lib.sh"
 
+
+# ------------------------------------------------------------------------------
+# Normalize critical vars (strip inline comments + trim) BEFORE contract checks
+# ------------------------------------------------------------------------------
+_strip() { printf "%s" "${1%%#*}" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g'; }
+
+TLS_MODE="$(_strip "${TLS_MODE:-}")"
+INGRESS_CLASS="$(_strip "${INGRESS_CLASS:-}")"
+CERT_CLUSTER_ISSUER="$(_strip "${CERT_CLUSTER_ISSUER:-}")"
+AIRBYTE_HOST="$(_strip "${AIRBYTE_HOST:-}")"
+
+
+
 : "${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}"
 export KUBECONFIG
 
@@ -201,37 +214,11 @@ server:
   extraEnvFrom:
     - configMapRef:
         name: airbyte-s3-config
-  extraEnv:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: "${MINIO_SECRET_NAME}"
-          key: "MINIO_ROOT_USER"
-          optional: false
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: "${MINIO_SECRET_NAME}"
-          key: "MINIO_ROOT_PASSWORD"
-          optional: false
 
 worker:
   extraEnvFrom:
     - configMapRef:
         name: airbyte-s3-config
-  extraEnv:
-    - name: AWS_ACCESS_KEY_ID
-      valueFrom:
-        secretKeyRef:
-          name: "${MINIO_SECRET_NAME}"
-          key: "MINIO_ROOT_USER"
-          optional: false
-    - name: AWS_SECRET_ACCESS_KEY
-      valueFrom:
-        secretKeyRef:
-          name: "${MINIO_SECRET_NAME}"
-          key: "MINIO_ROOT_PASSWORD"
-          optional: false
 YAML
 
 log "[03A][AIRBYTE] helm upgrade --install (${AIRBYTE_CHART} --version ${AIRBYTE_CHART_VERSION})"
@@ -245,66 +232,101 @@ helm upgrade --install "${AIRBYTE_RELEASE}" "${AIRBYTE_CHART}" \
 # 7) Force airbyte-airbyte-secrets MINIO_* to match OpenKPI (repeatable)
 #    (Some Airbyte components read MINIO_* from this chart secret.)
 # ------------------------------------------------------------------------------
-log "[03A][AIRBYTE] align airbyte-airbyte-secrets MINIO_* with OpenKPI"
+log "[03A][AIRBYTE] align airbyte-airbyte-secrets AWS/MINIO keys with OpenKPI"
 if kubectl -n "${AIRBYTE_NS}" get secret airbyte-airbyte-secrets >/dev/null 2>&1; then
   kubectl -n "${AIRBYTE_NS}" patch secret airbyte-airbyte-secrets --type=merge -p "{
     \"data\":{
       \"MINIO_ACCESS_KEY_ID\":\"$(b64 "${MINIO_AK}")\",
-      \"MINIO_SECRET_ACCESS_KEY\":\"$(b64 "${MINIO_SK}")\"
+      \"MINIO_SECRET_ACCESS_KEY\":\"$(b64 "${MINIO_SK}")\",
+      \"AWS_ACCESS_KEY_ID\":\"$(b64 "${MINIO_AK}")\",
+      \"AWS_SECRET_ACCESS_KEY\":\"$(b64 "${MINIO_SK}")\"
     }
   }" >/dev/null
 fi
 
 # ------------------------------------------------------------------------------
-# 8) Remove duplicate AWS_* env entries (prevents shadowing -> wrong creds -> 403)
+# 8) Normalize AWS env (remove duplicates; re-add from OpenKPI MinIO secret)
+#    - Works even if container names change
+#    - Skips missing deployments
+#    - Patches all Airbyte components that can touch object storage
 # ------------------------------------------------------------------------------
-log "[03A][AIRBYTE] normalize AWS env (remove duplicates; re-add from ${MINIO_SECRET_NAME})"
+log "[03A][AIRBYTE] normalize AWS env (dedupe; enforce from ${MINIO_SECRET_NAME})"
 
 cat >/tmp/mk_aws_env_patch.py <<'PY'
 import json, sys
-deploy = sys.argv[1]
+
+deploy      = sys.argv[1]
 secret_name = sys.argv[2]
-ak_key = sys.argv[3]
-sk_key = sys.argv[4]
+ak_key      = sys.argv[3]
+sk_key      = sys.argv[4]
 
 data = json.load(sys.stdin)
-containers = data["spec"]["template"]["spec"]["containers"]
+containers = data["spec"]["template"]["spec"].get("containers", [])
 
+# Prefer the first container that already has AWS vars; else fall back to container[0]
 cidx = 0
-for i,c in enumerate(containers):
-    n = c.get("name","")
-    if n in ("airbyte-server-container","airbyte-worker-container","server","worker",deploy):
-        cidx = i
+best = None
+for i, c in enumerate(containers):
+    env = c.get("env") or []
+    names = {e.get("name") for e in env if isinstance(e, dict)}
+    if "AWS_ACCESS_KEY_ID" in names or "AWS_SECRET_ACCESS_KEY" in names:
+        best = i
         break
+if best is not None:
+    cidx = best
 
-env = containers[cidx].get("env", []) or []
+env = containers[cidx].get("env") or []
 targets = {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"}
-remove_idxs = [i for i,e in enumerate(env) if e.get("name") in targets]
+
+remove_idxs = [i for i, e in enumerate(env) if isinstance(e, dict) and e.get("name") in targets]
 
 ops = []
+# Remove all occurrences (reverse index order)
 for i in sorted(remove_idxs, reverse=True):
-    ops.append({"op":"remove","path":f"/spec/template/spec/containers/{cidx}/env/{i}"})
+    ops.append({"op": "remove", "path": f"/spec/template/spec/containers/{cidx}/env/{i}"})
 
-ops.append({"op":"add","path":f"/spec/template/spec/containers/{cidx}/env/-",
-            "value":{"name":"AWS_ACCESS_KEY_ID","valueFrom":{"secretKeyRef":{"name":secret_name,"key":ak_key,"optional":False}}}})
-ops.append({"op":"add","path":f"/spec/template/spec/containers/{cidx}/env/-",
-            "value":{"name":"AWS_SECRET_ACCESS_KEY","valueFrom":{"secretKeyRef":{"name":secret_name,"key":sk_key,"optional":False}}}})
+# Re-add exactly one pair at the end
+ops.append({
+    "op": "add",
+    "path": f"/spec/template/spec/containers/{cidx}/env/-",
+    "value": {"name": "AWS_ACCESS_KEY_ID",
+              "valueFrom": {"secretKeyRef": {"name": secret_name, "key": ak_key, "optional": False}}}
+})
+ops.append({
+    "op": "add",
+    "path": f"/spec/template/spec/containers/{cidx}/env/-",
+    "value": {"name": "AWS_SECRET_ACCESS_KEY",
+              "valueFrom": {"secretKeyRef": {"name": secret_name, "key": sk_key, "optional": False}}}
+})
 
 print(json.dumps(ops))
 PY
 
 patch_env () {
   local dep="$1"
+
+  kubectl -n "${AIRBYTE_NS}" get deploy "${dep}" >/dev/null 2>&1 || {
+    log "[03A][AIRBYTE] skip env patch (deployment not found): ${dep}"
+    return 0
+  }
+
   kubectl -n "${AIRBYTE_NS}" get deploy "${dep}" -o json \
     | python3 /tmp/mk_aws_env_patch.py "${dep}" "${MINIO_SECRET_NAME}" "MINIO_ROOT_USER" "MINIO_ROOT_PASSWORD" \
     >/tmp/"${dep}".aws.patch.json
+
   kubectl -n "${AIRBYTE_NS}" patch deploy "${dep}" --type=json -p "$(cat /tmp/"${dep}".aws.patch.json)" >/dev/null
+  log "[03A][AIRBYTE] patched AWS env: ${dep}"
 }
 
+# Patch all likely Airbyte components that read/write S3/MinIO
 patch_env airbyte-server
 patch_env airbyte-worker
+patch_env airbyte-workload-api-server
+patch_env airbyte-workload-launcher
+patch_env airbyte-api-server
 
-kubectl -n "${AIRBYTE_NS}" rollout restart deploy/airbyte-server deploy/airbyte-worker >/dev/null
+# Restart what exists
+kubectl -n "${AIRBYTE_NS}" rollout restart deploy/airbyte-server deploy/airbyte-worker >/dev/null 2>&1 || true
 kubectl -n "${AIRBYTE_NS}" rollout status deploy/airbyte-server --timeout=15m
 kubectl -n "${AIRBYTE_NS}" rollout status deploy/airbyte-worker --timeout=15m || true
 
@@ -322,25 +344,44 @@ fi
 kubectl -n "${AIRBYTE_NS}" get svc --no-headers 2>/dev/null | awk '$3=="NodePort" || $3=="LoadBalancer"{bad=1} END{exit bad}' \
   || fatal "[03A][AIRBYTE] NodePort/LoadBalancer service remains after remediation"
 
+
+
+
 # ------------------------------------------------------------------------------
 # 10) Ingress + TLS Certificate (deterministic ownership)
 # ------------------------------------------------------------------------------
+
+kubectl -n "${AIRBYTE_NS}" apply --dry-run=client -f - >/dev/null <<'YAML'
+apiVersion: v1
+kind: List
+items: []
+YAML
+
+
 kubectl -n "${AIRBYTE_NS}" get svc "${AIRBYTE_UI_SVC}" >/dev/null 2>&1 || {
   kubectl -n "${AIRBYTE_NS}" get svc -o wide || true
   fatal "[03A][AIRBYTE] cannot find expected UI service ${AIRBYTE_UI_SVC}"
 }
 
 log "[03A][AIRBYTE] apply ingress airbyte -> ${AIRBYTE_UI_SVC}:${AIRBYTE_UI_PORT}"
+
 if [[ "${TLS_ENABLED}" == "true" ]]; then
+  : "${CERT_CLUSTER_ISSUER:?missing CERT_CLUSTER_ISSUER}"
+
   kubectl -n "${AIRBYTE_NS}" apply -f - <<YAML
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: airbyte
+  namespace: ${AIRBYTE_NS}
+  labels:
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/part-of: openkpi
 spec:
   ingressClassName: ${INGRESS_CLASS}
   tls:
-    - hosts: [${AIRBYTE_HOST}]
+    - hosts:
+        - ${AIRBYTE_HOST}
       secretName: airbyte-tls
   rules:
     - host: ${AIRBYTE_HOST}
@@ -359,31 +400,39 @@ YAML
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: airbyte-cert
+  name: airbyte-tls
+  namespace: ${AIRBYTE_NS}
+  labels:
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/part-of: openkpi
 spec:
   secretName: airbyte-tls
   privateKey:
     rotationPolicy: Never
   issuerRef:
     kind: ClusterIssuer
-    name: letsencrypt-http01
+    name: ${CERT_CLUSTER_ISSUER}
   dnsNames:
     - ${AIRBYTE_HOST}
 YAML
 
   log "[03A][AIRBYTE] wait Certificate Ready"
-  retry 90 10 bash -lc "kubectl -n '${AIRBYTE_NS}' get certificate airbyte-cert >/dev/null 2>&1"
-  retry 90 10 bash -lc "kubectl -n '${AIRBYTE_NS}' get certificate airbyte-cert -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' | grep -q True" || {
-    kubectl -n "${AIRBYTE_NS}" describe certificate airbyte-cert | sed -n '1,260p' || true
+  kubectl -n "${AIRBYTE_NS}" wait --for=condition=Ready certificate/airbyte-tls --timeout=900s || {
+    kubectl -n "${AIRBYTE_NS}" describe certificate airbyte-tls | sed -n '1,260p' || true
     kubectl -n "${AIRBYTE_NS}" get order,challenge -o wide 2>/dev/null || true
     fatal "[03A][AIRBYTE] certificate not Ready"
   }
+
 else
   kubectl -n "${AIRBYTE_NS}" apply -f - <<YAML
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: airbyte
+  namespace: ${AIRBYTE_NS}
+  labels:
+    app.kubernetes.io/name: airbyte
+    app.kubernetes.io/part-of: openkpi
 spec:
   ingressClassName: ${INGRESS_CLASS}
   rules:
@@ -399,6 +448,7 @@ spec:
                   number: ${AIRBYTE_UI_PORT}
 YAML
 fi
+
 
 # ------------------------------------------------------------------------------
 # 11) Readiness gate (bounded)

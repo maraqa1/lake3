@@ -63,7 +63,7 @@ set -a
 . "${OPENKPI_ENV_FILE}"
 set +a
 
-NS_OPENKPI="${NS_OPENKPI:-${NS:-open-kpi}}"
+NS_OPENKPI="${OPENKPI_NS:-${NS_OPENKPI:-${NS:-open-kpi}}}"
 STORAGE_CLASS="${STORAGE_CLASS:-local-path}"
 
 : "${OPENKPI_PG_DB:?missing OPENKPI_PG_DB in contract}"
@@ -100,7 +100,11 @@ apply_secret_generic() {
 apply_secret_generic "openkpi-postgres-secret" \
   --from-literal=POSTGRES_DB="${OPENKPI_PG_DB}" \
   --from-literal=POSTGRES_USER="${OPENKPI_PG_USER}" \
-  --from-literal=POSTGRES_PASSWORD="${OPENKPI_PG_PASSWORD}"
+  --from-literal=POSTGRES_PASSWORD="${OPENKPI_PG_PASSWORD}" \
+  --from-literal=postgres-db="${OPENKPI_PG_DB}" \
+  --from-literal=postgres-user="${OPENKPI_PG_USER}" \
+  --from-literal=postgres-password="${OPENKPI_PG_PASSWORD}"
+
 
 apply_secret_generic "openkpi-minio-secret" \
   --from-literal=MINIO_ROOT_USER="${OPENKPI_MINIO_ROOT_USER}" \

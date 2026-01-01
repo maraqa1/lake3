@@ -43,9 +43,11 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 log "[02-minio] start"
 
 require_cmd kubectl
+require_cmd jq
 require_var OPENKPI_NS
 require_var STORAGE_CLASS
 require_var INGRESS_CLASS
+
 
 require_var MINIO_EXPOSE
 require_var MINIO_HOST

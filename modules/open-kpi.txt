@@ -1,0 +1,175 @@
+# ======================================================================
+# /root/open-kpi.env — OpenKPI single source of truth (DEDUPED + COMPAT)
+# Real domains: lake1.opendatalake.com
+# ======================================================================
+
+# -----------------------
+# Core cluster controls
+# -----------------------
+STORAGE_CLASS="local-path"
+INGRESS_CLASS="nginx"
+TLS_MODE="per-host-http01"
+ACME_EMAIL="admin@yottalogica.com"
+KUBE_DNS_IP="10.43.0.10"
+
+# Issuer (canonical)
+CLUSTER_ISSUER=letsencrypt-http01
+# Backward-compat issuer key (older modules)
+CERT_CLUSTER_ISSUER="letsencrypt-http01"
+
+# -----------------------
+# Domains (REAL)
+# -----------------------
+APP_DOMAIN="lake4.opendatalake.com"
+
+AIRBYTE_HOST=airbyte.lake4.opendatalake.com
+MINIO_HOST="minio.${APP_DOMAIN}"
+METABASE_HOST="metabase.${APP_DOMAIN}"
+N8N_HOST="n8n.${APP_DOMAIN}"
+ZAMMAD_HOST="zammad.${APP_DOMAIN}"
+DBT_HOST="dbt.${APP_DOMAIN}"
+PORTAL_HOST="portal.${APP_DOMAIN}"
+POSTGRES_HOST="postgres.${APP_DOMAIN}"
+
+# -----------------------
+# Namespaces (canonical)
+# -----------------------
+OPENKPI_NS="open-kpi"
+PLATFORM_NS="platform"
+AIRBYTE_NS="airbyte"
+ANALYTICS_NS="analytics"
+N8N_NS="n8n"
+TICKETS_NS="tickets"
+TRANSFORM_NS="transform"
+
+# Backward-compat generic NS (avoid using in scripts, keep only if legacy modules read it)
+NS="${OPENKPI_NS}"
+
+# -----------------------
+# Shared Postgres (OpenKPI platform DB)
+# Canonical keys expected by "missing POSTGRES_PASSWORD" checks
+# -----------------------
+POSTGRES_SERVICE="openkpi-postgres.${OPENKPI_NS}.svc.cluster.local"
+POSTGRES_PORT="5432"
+POSTGRES_DB="openkpi"
+POSTGRES_USER="openkpi_admin"
+POSTGRES_PASSWORD="axVm1f0pAyn1lg3Xf0xRQ7ez"
+
+# Backward-compat aliases
+OPENKPI_PG_DB="${POSTGRES_DB}"
+OPENKPI_PG_USER="${POSTGRES_USER}"
+OPENKPI_PG_PASSWORD="${POSTGRES_PASSWORD}"
+
+# -----------------------
+# Shared MinIO (OpenKPI object store)
+# Canonical keys
+# -----------------------
+MINIO_SERVICE="openkpi-minio.${OPENKPI_NS}.svc.cluster.local"
+MINIO_API_PORT="9000"
+MINIO_CONSOLE_PORT="9001"
+MINIO_ROOT_USER="minioadmin"
+MINIO_ROOT_PASSWORD="Xftt0BWEDPxk267ImjKs1Txt"
+
+# Backward-compat aliases
+OPENKPI_MINIO_ROOT_USER="${MINIO_ROOT_USER}"
+OPENKPI_MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}"
+
+# TLS secret names (make HTTPS modules deterministic)
+MINIO_TLS_SECRET="minio-tls"
+PORTAL_TLS_SECRET="portal-tls"
+
+# -----------------------
+# Airbyte docstore / S3 wiring (MinIO)
+# -----------------------
+AIRBYTE_S3_REGION="us-east-1"
+
+# -----------------------
+# n8n
+# -----------------------
+N8N_PASS="frEvOR7CqMGUl8Gbu0mWRoKk40KaRMln"
+N8N_ENCRYPTION_KEY="wdFhIqYTPF67IjuBFsF7otxAPAKTuT_kM764F8ZCz-E"
+
+# -----------------------
+# Zammad
+# -----------------------
+ZAMMAD_ADMIN_EMAIL="admin@${APP_DOMAIN}"
+ZAMMAD_ADMIN_PASSWORD="m9N5ed8rIBBiIm36fsrHWUSLs6pW-3YA"
+
+# -----------------------
+# Metabase
+# -----------------------
+METABASE_NAMESPACE="${ANALYTICS_NS}"
+METABASE_RELEASE="metabase"
+METABASE_IMAGE_REPO="metabase/metabase"
+METABASE_IMAGE_TAG="v0.56.x"
+
+METABASE_DB_NAME="metabase"
+METABASE_DB_USER="metabase"
+METABASE_DB_PASSWORD="AeoIlDHu5TMP3myLUtltZ0v9IR0mdZG-"
+
+# -----------------------
+# dbt (authoritative contract)
+# -----------------------
+DBT_GIT_REPO="https://github.com/maraqa1/his_demo.git"
+DBT_IMAGE="ghcr.io/dbt-labs/dbt-postgres:1.8.latest"
+DBT_CRON_SCHEDULE="0 2 * * *"
+
+DBT_PROFILE_NAME="his_demo"
+DBT_TARGET_NAME="prod"
+
+DBT_DB_HOST="${POSTGRES_SERVICE}"
+DBT_DB_PORT="${POSTGRES_PORT}"
+DBT_DB_NAME="analytics"
+DBT_DB_USER="dbt_user"
+DBT_DB_PASSWORD="Latino1@1"
+DBT_MANAGE_DB_OBJECTS="true"
+
+# -----------------------
+# Portal UI deployment identifiers (deterministic, repeatable)
+# -----------------------
+PORTAL_UI_DEPLOY="portal-ui"
+PORTAL_UI_SVC="portal-ui"
+PORTAL_UI_CM="portal-ui-static"
+PORTAL_API_SVC="portal-api"
+
+# -----------------------
+# Node info (optional; DO NOT derive domains from these)
+# -----------------------
+NODE_IP="95.216.142.225"
+APP_EXTERNAL_IP_OVERRIDE=""
+IP_DASHED="95-216-142-225"
+HOST_BASE="lake4.opendatalake.com"
+DOMAIN_BASE="95-216-142-225.nip.io"
+
+TLS_MODE="per-host-http01"   # on
+# or
+#TLS_MODE="off"               # off
+
+# -----------------------
+# External access toggles
+# -----------------------
+
+# Postgres public exposure for laptop tools (DBeaver)
+PG_PUBLIC_ACCESS="off"          # on|off
+PG_PUBLIC_MODE="loadbalancer"   # loadbalancer|nodeport
+PG_PUBLIC_PORT="5432"           # 5432 or nodeport value if nodeport
+PG_PUBLIC_ALLOWED_CIDRS=""      # optional, e.g. "1.2.3.4/32,5.6.7.8/32"
+
+AIRBYTE_MINIO_DOCSTORE_FIX="on"    # on|off
+PORTAL_SHOW_HEALTH="on"            # on|off
+PORTAL_SHOW_LINKS="on"             # on|off
+
+# TLS / cert-manager (ACME)
+TLS_MODE=per-host-http01
+LE_EMAIL=admin@opendatalake.com
+CERT_CLUSTER_ISSUER=letsencrypt-http01
+INGRESS_CLASS=nginx
+
+MINIO_MC_IMAGE=minio/mc:RELEASE.2024-11-05T11-29-45Z
+
+AIRBYTE_CHART_VERSION="1.9.1"
+AIRBYTE_APP_VERSION="2.0.1"
+AIRBYTE_EXPOSE="on"
+AIRBYTE_DB_NAME="airbyte"
+AIRBYTE_DB_USER="airbyte"
+AIRBYTE_DB_PASSWORD="m9N5ed8rIBBiIm36fsrHWUSLs6pW-3YA"

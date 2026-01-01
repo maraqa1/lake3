@@ -382,6 +382,114 @@ if kubectl -n "${NS}" get deploy,sts,svc 2>/dev/null | egrep -i 'minio' >/dev/nu
   die "[${MODULE_ID}] chart MinIO still present in ${NS} (minio.enabled=false not honored)"
 fi
 
+# ==============================================================================
+# SECTION 06 — Pre-flight cleanup + Helm lock recovery (repeatable)
+#   Goals:
+#   - Clear Helm "pending-*" lock states deterministically.
+#   - Remove stuck pods/jobs from previous failed attempts.
+#   - If env patch conflicts occur, recreate the conflicting deployments and re-run.
+#
+#   IMPORTANT: This section assumes you are NOT kubectl-patching Airbyte env vars
+#              outside Helm. Any such patching is what creates the env[] order
+#              and value/valueFrom conflicts.
+# ==============================================================================
+
+log "[${MODULE_ID}] pre-flight cleanup (stuck pods/jobs + helm pending)"
+
+# 06A — delete bootstrap artifacts (safe/idempotent)
+kubectl_k -n "${NS}" delete pod airbyte-db-bootstrap --ignore-not-found >/dev/null 2>&1 || true
+kubectl_k -n "${NS}" delete cm  airbyte-db-bootstrap-script --ignore-not-found >/dev/null 2>&1 || true
+
+# 06B — delete failed Jobs / Completed pods that can block retries (best-effort)
+kubectl_k -n "${NS}" delete job -l "${APP_LABEL_KEY}=${APP_LABEL_VAL}" --ignore-not-found >/dev/null 2>&1 || true
+
+# 06C — delete CrashLoopBackOff / Error pods (repeatable)
+bad_pods="$(
+  kubectl -n "${NS}" get pods --no-headers 2>/dev/null \
+  | awk '$3 ~ /(CrashLoopBackOff|Error|ImagePullBackOff|ErrImagePull)/ {print $1}' \
+  | tr '\n' ' ' || true
+)"
+if [[ -n "${bad_pods// }" ]]; then
+  log "[${MODULE_ID}] delete bad pods: ${bad_pods}"
+  kubectl_k -n "${NS}" delete pod ${bad_pods} --grace-period=0 --force >/dev/null 2>&1 || true
+fi
+
+# 06D — if Helm is stuck in pending-* state, clear it deterministically
+if helm -n "${NS}" status "${REL}" >/dev/null 2>&1; then
+  h_status="$(helm -n "${NS}" status "${REL}" 2>/dev/null | awk -F': ' '/^STATUS:/ {print $2}' | tr -d '\r' || true)"
+  case "${h_status}" in
+    pending-install|pending-upgrade|pending-rollback)
+      log "[${MODULE_ID}] helm stuck (STATUS=${h_status}) -> uninstall release to clear lock"
+      helm -n "${NS}" uninstall "${REL}" >/dev/null 2>&1 || true
+
+      # wipe ONLY Helm-owned objects (keeps your shared Postgres/MinIO in other namespaces)
+      kubectl_k -n "${NS}" delete deploy,sts,svc,cm,secret,ingress \
+        -l "app.kubernetes.io/instance=${REL}" --ignore-not-found >/dev/null 2>&1 || true
+      ;;
+  esac
+fi
+
+# ==============================================================================
+# SECTION 06E — Helm deploy (NON-ATOMIC) + deterministic hard-reset on failure
+#   Why:
+#   - --atomic triggers rollback, which re-triggers the exact patch conflict you see.
+#   - We deploy without atomic; if anything fails, we hard-reset the release and install fresh.
+#   - This cleanly recreates Deployments and eliminates env value/valueFrom + order drift.
+# ==============================================================================
+
+log "[${MODULE_ID}] deploy release: ${REL} (namespace=${NS})"
+
+_helm_install_fresh() {
+  helm -n "${NS}" install "${REL}" airbyte/airbyte \
+    -f "${VALUES_FILE}" \
+    --timeout 25m \
+    --history-max 5 \
+    --wait
+}
+
+_helm_upgrade_noatomic() {
+  helm -n "${NS}" upgrade --install "${REL}" airbyte/airbyte \
+    -f "${VALUES_FILE}" \
+    --timeout 25m \
+    --history-max 5 \
+    --wait
+}
+
+_hard_reset_release() {
+  log "[${MODULE_ID}] hard-reset release=${REL} (uninstall + delete leftovers)"
+
+  # 1) uninstall (ignore failures)
+  helm -n "${NS}" uninstall "${REL}" >/dev/null 2>&1 || true
+
+  # 2) remove any leftover k8s objects Helm might have left behind
+  kubectl_k -n "${NS}" delete deploy,sts,ds,job,cronjob,svc,ingress,cm,secret \
+    -l "app.kubernetes.io/instance=${REL}" --ignore-not-found >/dev/null 2>&1 || true
+
+  # 3) ensure poisoned deployments are gone even if labels differed
+  kubectl_k -n "${NS}" delete deploy \
+    airbyte-server airbyte-worker airbyte-webapp \
+    airbyte-workload-launcher airbyte-workload-api-server \
+    airbyte-temporal airbyte-cron airbyte-connector-builder-server \
+    --ignore-not-found >/dev/null 2>&1 || true
+
+  # 4) clear any helm secret state (rare, but fixes stuck pending histories)
+  kubectl_k -n "${NS}" delete secret -l "owner=helm,name=${REL}" --ignore-not-found >/dev/null 2>&1 || true
+  kubectl_k -n "${NS}" delete secret -l "owner=helm,app.kubernetes.io/instance=${REL}" --ignore-not-found >/dev/null 2>&1 || true
+}
+
+set +e
+_helm_upgrade_noatomic
+rc=$?
+set -e
+
+if [[ $rc -ne 0 ]]; then
+  log "[${MODULE_ID}] helm upgrade failed (rc=${rc}) -> hard reset + fresh install"
+  _hard_reset_release
+  _helm_install_fresh
+fi
+
+log "[${MODULE_ID}] helm deploy finished"
+
 
 # ==============================================================================
 # SECTION 07 — Exposure + Ingress + TLS

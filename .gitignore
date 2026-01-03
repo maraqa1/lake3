@@ -1,0 +1,3 @@
+# generated helm values (local)
+.values-*.yaml
+.values-*.yml

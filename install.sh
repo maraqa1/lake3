@@ -17,6 +17,9 @@ run_step(){
   log "done: ${name}"
 }
 
+# --- PRE-REQ: bootstrap cluster once ---
+./modules/00-core/01-prereq-k3s.sh
+
 run_step "00-env" "modules/00-env/00-env.sh" "modules/00-env/tests.sh"
 run_step "01-core" "modules/01-core/01-core.sh" "modules/01-core/tests.sh"
 run_step "02-postgres" "modules/02-data-plane/02-postgres.sh" "modules/02-data-plane/tests-postgres.sh"

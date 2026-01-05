@@ -1,17 +1,21 @@
+\
 #!/usr/bin/env bash
 set -euo pipefail
 
 # ==============================================================================
-# 04-portal-api.sh  OpenKPI Portal API (Phase 1)  DROP-IN / REPEATABLE
-# - DO NOT use variable name "HERE" (00-env.sh overwrites it)
+# 04-portal-api.sh  Deploy OpenKPI Portal API (Phase 1) [REPEATABLE]
+#
+# Contract:
+# - Sources OpenKPI root: 00-env.sh + 00-lib.sh (loads /root/open-kpi.env)
 # - Packages ./app -> app.tgz
-# - ConfigMap: ${PLATFORM_NS}/portal-api-src (key: app.tgz)
-# - Deploys python api on :8000 behind Service portal-api
-# - NO Ingress here (UI ingress owns /api)
+# - Creates/updates ConfigMap ${PLATFORM_NS}/portal-api-src with app.tgz
+# - initContainer untars into /app, main container runs gunicorn on :8000
+# - Service: portal-api:8000 (target 8000)
+# - No Ingress here (UI module owns shared host routing /api)
 # ==============================================================================
-
-MOD_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-ROOT="$(cd -- "${MOD_DIR}/../../.." && pwd)"
+# MODULE PATH (do not use HERE; 00-env overwrites it)
+MOD_DIR="0 0cd -- "0 0dirname -- "0 0readlink -f "")")" && pwd)"
+ROOT="0 0cd -- "/../../.." && pwd)"
 
 # shellcheck source=/dev/null
 . "${ROOT}/00-env.sh"
@@ -24,27 +28,29 @@ require_cmd kubectl tar
 : "${PORTAL_API_DEPLOY:=portal-api}"
 : "${PORTAL_API_SVC:=portal-api}"
 : "${PORTAL_API_PORT:=8000}"
+: "${POSTGRES_SERVICE:=openkpi-postgres.open-kpi.svc.cluster.local}"
+: "${POSTGRES_PORT:=5432}"
+: "${POSTGRES_DB:=openkpi}"
+: "${POSTGRES_USER:=openkpi_admin}"
+: "${POSTGRES_PASSWORD:=}"
+: "${MINIO_SERVICE:=openkpi-minio.open-kpi.svc.cluster.local}"
+: "${MINIO_API_PORT:=9000}"
+: "${MINIO_ROOT_USER:=}"
+: "${MINIO_ROOT_PASSWORD:=}"
+: "${INGRESS_CLASS:=nginx}"
+: "${PORTAL_HOST:=portal.local}"
 
-log "[04][portal-api] start (ns=${PLATFORM_NS}, mod_dir=${MOD_DIR})"
-
+log "[04][portal-api] start (ns=${PLATFORM_NS})"
 kubectl get ns "${PLATFORM_NS}" >/dev/null 2>&1 || kubectl create ns "${PLATFORM_NS}" >/dev/null
 
-APP_DIR="${MOD_DIR}/app"
-if [[ ! -d "${APP_DIR}" ]]; then
-  echo "FATAL: missing ${APP_DIR}"
-  ls -la "${MOD_DIR}"
-  exit 1
-fi
-if [[ ! -f "${APP_DIR}/requirements.txt" ]]; then
-  echo "FATAL: missing ${APP_DIR}/requirements.txt"
-  ls -la "${APP_DIR}"
-  exit 1
-fi
+# package app/
+[ -d "${MOD_DIR}/app" ] || { echo "FATAL: missing ${MOD_DIR}/app"; ls -la "${MOD_DIR}"; exit 1; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 tar -czf "${TMP}/app.tgz" -C "${MOD_DIR}" app
 
+# configmap with tarball
 kubectl -n "${PLATFORM_NS}" create configmap portal-api-src \
   --from-file=app.tgz="${TMP}/app.tgz" \
   -o yaml --dry-run=client | kubectl apply -f - >/dev/null
@@ -68,19 +74,18 @@ spec:
         - name: api-src
           configMap:
             name: portal-api-src
-        - name: api-work
+        - name: api-app
           emptyDir: {}
       initContainers:
         - name: unpack
           image: alpine:3.20
-          command: ["sh","-lc","set -e; mkdir -p /work; tar -xzf /src/app.tgz -C /work; test -f /work/app/requirements.txt; ls -la /work/app | head -n 30"]
+          command: ["sh","-lc","set -e; mkdir -p /app; tar -xzf /src/app.tgz -C /app; ls -la /app/app | head"]
           volumeMounts:
             - name: api-src
               mountPath: /src
               readOnly: true
-            - name: api-work
-              mountPath: /work
-              
+            - name: api-app
+              mountPath: /app
       containers:
         - name: api
           image: python:3.12-slim
@@ -103,34 +108,36 @@ spec:
               value: "${TRANSFORM_NS:-transform}"
 
             - name: POSTGRES_HOST
-              value: "${OPENKPI_PG_HOST:-${POSTGRES_SERVICE:-openkpi-postgres.open-kpi.svc.cluster.local}}"
+              value: "${POSTGRES_SERVICE}"
             - name: POSTGRES_PORT
-              value: "${OPENKPI_PG_PORT:-${POSTGRES_PORT:-5432}}"
+              value: "${POSTGRES_PORT}"
             - name: POSTGRES_DB
-              value: "${OPENKPI_PG_DB:-${POSTGRES_DB:-openkpi}}"
+              value: "${POSTGRES_DB}"
             - name: POSTGRES_USER
-              value: "${OPENKPI_PG_USER:-${POSTGRES_USER:-openkpi_admin}}"
+              value: "${POSTGRES_USER}"
             - name: POSTGRES_PASSWORD
-              value: "${OPENKPI_PG_PASSWORD:-${POSTGRES_PASSWORD:-}}"
+              value: "${POSTGRES_PASSWORD}"
 
-            - name: MINIO_ENDPOINT
-              value: "${MINIO_ENDPOINT_INTERNAL:-${OPENKPI_MINIO_ENDPOINT:-http://openkpi-minio.open-kpi.svc.cluster.local:9000}}"
+            - name: MINIO_HOST
+              value: "${MINIO_SERVICE}"
+            - name: MINIO_PORT
+              value: "${MINIO_API_PORT}"
             - name: MINIO_USER
-              value: "${MINIO_ROOT_USER:-${OPENKPI_MINIO_USER:-}}"
+              value: "${MINIO_ROOT_USER}"
             - name: MINIO_PASSWORD
-              value: "${MINIO_ROOT_PASSWORD:-${OPENKPI_MINIO_PASSWORD:-}}"
+              value: "${MINIO_ROOT_PASSWORD}"
 
-          volumeMounts:
-            - name: api-work
-              mountPath: /work
-
-          workingDir: /work
+            - name: PORTAL_HOST
+              value: "${PORTAL_HOST}"
+            - name: INGRESS_CLASS
+              value: "${INGRESS_CLASS}"
+          workingDir: /app
           command: ["sh","-lc"]
           args:
             - |
               set -e
-              python -m pip install --no-cache-dir -r /work/app/requirements.txt >/dev/null
-              exec python -m gunicorn -b 0.0.0.0:\${PORT} "app.server:app" --workers 2 --threads 4 --timeout 60
+              python -m pip install --no-cache-dir -r /app/app/requirements.txt >/dev/null
+              exec python -m gunicorn -b 0.0.0.0:${PORTAL_API_PORT} "app.server:app" --workers 2 --threads 4 --timeout 60
           ports:
             - containerPort: ${PORTAL_API_PORT}
           readinessProbe:
@@ -156,5 +163,5 @@ spec:
       targetPort: ${PORTAL_API_PORT}
 YAML
 
-kubectl -n "${PLATFORM_NS}" rollout status "deploy/${PORTAL_API_DEPLOY}" --timeout=180s
+kubectl -n "${PLATFORM_NS}" rollout status deploy/${PORTAL_API_DEPLOY} --timeout=180s
 log "[04][portal-api] OK"

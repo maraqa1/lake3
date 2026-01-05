@@ -3,11 +3,18 @@ set -euo pipefail
 
 # ==============================================================================
 # 04-portal-api.sh  OpenKPI Portal API (Phase 1)  DROP-IN / REPEATABLE
-# - DO NOT use variable name "HERE" (00-env.sh overwrites it)
+#
+# Key rule: DO NOT use variable name "HERE". 00-env.sh overwrites it.
+# This script uses MOD_DIR for its own location and never depends on CWD.
+#
+# Contract:
 # - Packages ./app -> app.tgz
-# - ConfigMap: ${PLATFORM_NS}/portal-api-src (key: app.tgz)
-# - Deploys python api on :8000 behind Service portal-api
-# - NO Ingress here (UI ingress owns /api)
+# - Publishes ConfigMap ${PLATFORM_NS}/portal-api-src (key: app.tgz)
+# - Deployment:
+#     initContainer: untar to /work
+#     container: python:3.12-slim installs requirements then runs gunicorn on :8000
+# - Service: portal-api:${PORTAL_API_PORT}
+# - NO Ingress here (UI module owns shared host routing /api)
 # ==============================================================================
 
 MOD_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -29,6 +36,7 @@ log "[04][portal-api] start (ns=${PLATFORM_NS}, mod_dir=${MOD_DIR})"
 
 kubectl get ns "${PLATFORM_NS}" >/dev/null 2>&1 || kubectl create ns "${PLATFORM_NS}" >/dev/null
 
+# ---- app assets (module-local)
 APP_DIR="${MOD_DIR}/app"
 if [[ ! -d "${APP_DIR}" ]]; then
   echo "FATAL: missing ${APP_DIR}"
@@ -41,14 +49,17 @@ if [[ ! -f "${APP_DIR}/requirements.txt" ]]; then
   exit 1
 fi
 
+# ---- package app/ -> app.tgz (must contain top-level folder app/)
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 tar -czf "${TMP}/app.tgz" -C "${MOD_DIR}" app
 
+# ---- ConfigMap (idempotent)
 kubectl -n "${PLATFORM_NS}" create configmap portal-api-src \
   --from-file=app.tgz="${TMP}/app.tgz" \
   -o yaml --dry-run=client | kubectl apply -f - >/dev/null
 
+# ---- Deployment + Service (idempotent apply)
 kubectl apply -f - <<YAML
 apiVersion: apps/v1
 kind: Deployment
@@ -80,7 +91,6 @@ spec:
               readOnly: true
             - name: api-work
               mountPath: /work
-              
       containers:
         - name: api
           image: python:3.12-slim
@@ -102,6 +112,7 @@ spec:
             - name: TRANSFORM_NS
               value: "${TRANSFORM_NS:-transform}"
 
+            # Optional service hosts (your app can ignore if unused)
             - name: POSTGRES_HOST
               value: "${OPENKPI_PG_HOST:-${POSTGRES_SERVICE:-openkpi-postgres.open-kpi.svc.cluster.local}}"
             - name: POSTGRES_PORT
@@ -119,18 +130,13 @@ spec:
               value: "${MINIO_ROOT_USER:-${OPENKPI_MINIO_USER:-}}"
             - name: MINIO_PASSWORD
               value: "${MINIO_ROOT_PASSWORD:-${OPENKPI_MINIO_PASSWORD:-}}"
-
-          volumeMounts:
-            - name: api-work
-              mountPath: /work
-
           workingDir: /work
           command: ["sh","-lc"]
           args:
             - |
               set -e
               python -m pip install --no-cache-dir -r /work/app/requirements.txt >/dev/null
-              exec python -m gunicorn -b 0.0.0.0:\${PORT} "app.server:app" --workers 2 --threads 4 --timeout 60
+              exec python -m gunicorn -b 0.0.0.0:${PORT} "app.server:app" --workers 2 --threads 4 --timeout 60
           ports:
             - containerPort: ${PORTAL_API_PORT}
           readinessProbe:

@@ -2,120 +2,124 @@
 set -euo pipefail
 
 # ==============================================================================
-# 04-portal-ui.sh — Deploy OpenKPI Portal UI (Phase 1)
-# - Namespace: ${PLATFORM_NS}
-# - Service: portal-ui:80
-# - Ingress (single host split):
-#     /     -> portal-ui:80
-#     /api  -> ${PORTAL_API_SVC:-portal-api}:${PORTAL_API_PORT:-8000}
-# - UI served by nginx, assets packaged as tgz -> ConfigMap -> initContainer extract
-# - No Helm; kubectl apply only
+# 04-portal-ui.sh — OpenKPI Portal UI (static nginx) [REPEATABLE]
+# - Packages ./ui -> ui.tgz
+# - Creates/updates ConfigMap ${PLATFORM_NS}/portal-ui-static with ui.tgz
+# - nginx serves static UI
+# - Creates/updates ONE ingress on ${PORTAL_HOST}:
+#     /api -> ${PORTAL_API_SVC}:${PORTAL_API_PORT}
+#     /    -> portal-ui:80
+#
+# Critical: uses MODULE_DIR, not HERE (00-env.sh overwrites HERE).
 # ==============================================================================
 
-HERE="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)" pwd)"
-ROOT="$(cd -- "${HERE}/../../.." && pwd)"
+MODULE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "${MODULE_DIR}/../../.." && pwd)"
 
 # shellcheck source=/dev/null
-. "${ROOT}/00-env.sh"
+. "${ROOT_DIR}/00-env.sh"
 # shellcheck source=/dev/null
-. "${ROOT}/00-lib.sh"
+. "${ROOT_DIR}/00-lib.sh"
 
 require_cmd kubectl tar
 
-NS="${PLATFORM_NS:-platform}"
-UI_NAME="portal-ui"
-API_SVC="${PORTAL_API_SVC:-portal-api}"
-API_PORT="${PORTAL_API_PORT:-8000}"
+: "${PLATFORM_NS:=platform}"
+: "${INGRESS_CLASS:=nginx}"
+: "${PORTAL_HOST:=portal.local}"
 
-# ensure namespace exists
-kubectl get ns "${NS}" >/dev/null 2>&1 || kubectl create ns "${NS}" >/dev/null
+: "${PORTAL_UI_DEPLOY:=portal-ui}"
+: "${PORTAL_UI_SVC:=portal-ui}"
+: "${PORTAL_UI_CM:=portal-ui-static}"
 
-# package UI assets
-[[ -d "${HERE}/ui" ]] || { echo "[FATAL] missing ${HERE}/ui"; ls -la "${HERE}"; exit 1; }
+: "${PORTAL_API_SVC:=portal-api}"
+: "${PORTAL_API_PORT:=8000}"
+
+: "${TLS_MODE:=off}"
+: "${PORTAL_TLS_SECRET:=portal-tls}"
+
+log "[04][portal-ui] start (ns=${PLATFORM_NS}, host=${PORTAL_HOST})"
+
+kubectl get ns "${PLATFORM_NS}" >/dev/null 2>&1 || kubectl create ns "${PLATFORM_NS}" >/dev/null
+
+UI_DIR="${MODULE_DIR}/ui"
+[ -d "${UI_DIR}" ] || { echo "FATAL: missing ${UI_DIR}"; ls -la "${MODULE_DIR}"; exit 1; }
+[ -f "${UI_DIR}/index.html" ] || { echo "FATAL: missing ${UI_DIR}/index.html"; ls -la "${UI_DIR}"; exit 1; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
-# tar must contain top-level folder "ui/"
-tar -czf "${TMP}/ui.tgz" -C "${HERE}" ui
+tar -czf "${TMP}/ui.tgz" -C "${MODULE_DIR}" ui
 
-kubectl -n "${NS}" delete configmap portal-ui-src --ignore-not-found >/dev/null 2>&1 || true
-kubectl -n "${NS}" create configmap portal-ui-src --from-file=ui.tgz="${TMP}/ui.tgz" --dry-run=client -o yaml \
-  | kubectl apply -f -
+kubectl -n "${PLATFORM_NS}" create configmap "${PORTAL_UI_CM}" \
+  --from-file=ui.tgz="${TMP}/ui.tgz" \
+  -o yaml --dry-run=client | kubectl apply -f - >/dev/null
 
-kapply <<YAML
+TLS_ENABLED="false"
+if [[ "${TLS_MODE}" != "off" && "${TLS_MODE}" != "OFF" ]]; then
+  TLS_ENABLED="true"
+fi
+
+# IMPORTANT: portal-api ingress must NOT exist; this ingress owns /api and / on the same host.
+kubectl apply -f - <<YAML
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${UI_NAME}
-  namespace: ${NS}
+  name: ${PORTAL_UI_DEPLOY}
+  namespace: ${PLATFORM_NS}
+  labels: { app: portal-ui }
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: ${UI_NAME}
+    matchLabels: { app: portal-ui }
   template:
     metadata:
-      labels:
-        app: ${UI_NAME}
+      labels: { app: portal-ui }
     spec:
       volumes:
         - name: ui-src
           configMap:
-            name: portal-ui-src
-        - name: ui-www
+            name: ${PORTAL_UI_CM}
+        - name: ui-html
           emptyDir: {}
       initContainers:
-        - name: unpack
-          image: busybox:1.36
+        - name: unpack-ui
+          image: alpine:3.20
           command:
             - sh
             - -lc
             - |
               set -e
-              mkdir -p /tmp/ui && tar -xzf /src/ui.tgz -C /tmp/ui
-              cp -r /tmp/ui/ui/* /usr/share/nginx/html/
+              mkdir -p /www
+              tar -xzf /src/ui.tgz -C /www
+              rm -rf /dest/*
+              cp -r /www/ui/* /dest/
           volumeMounts:
             - name: ui-src
               mountPath: /src
-            - name: ui-www
-              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: ui-html
+              mountPath: /dest
       containers:
         - name: nginx
           image: nginx:1.27-alpine
           ports:
             - containerPort: 80
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 256Mi
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 3
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 10
-            periodSeconds: 20
           volumeMounts:
-            - name: ui-www
+            - name: ui-html
               mountPath: /usr/share/nginx/html
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 2
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ${UI_NAME}
-  namespace: ${NS}
+  name: ${PORTAL_UI_SVC}
+  namespace: ${PLATFORM_NS}
+  labels: { app: portal-ui }
 spec:
-  selector:
-    app: ${UI_NAME}
+  selector: { app: portal-ui }
   ports:
     - name: http
       port: 80
@@ -125,36 +129,36 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: portal-ingress
-  namespace: ${NS}
+  namespace: ${PLATFORM_NS}
   annotations:
-    kubernetes.io/ingress.class: "${INGRESS_CLASS}"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "${CLUSTER_ISSUER}"
+    kubernetes.io/ingress.class: ${INGRESS_CLASS}
 spec:
-  ingressClassName: "${INGRESS_CLASS}"
-  tls:
-    - hosts:
-        - "${PORTAL_HOST}"
-      secretName: portal-tls
+  ingressClassName: ${INGRESS_CLASS}
   rules:
-    - host: "${PORTAL_HOST}"
+    - host: ${PORTAL_HOST}
       http:
         paths:
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: ${API_SVC}
+                name: ${PORTAL_API_SVC}
                 port:
-                  number: ${API_PORT}
+                  number: ${PORTAL_API_PORT}
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: ${UI_NAME}
+                name: ${PORTAL_UI_SVC}
                 port:
                   number: 80
 YAML
 
-wait_deploy "${NS}" "${UI_NAME}"
-log "[04-portal-ui] OK (ns=${NS}, host=${PORTAL_HOST})"
+if [[ "${TLS_ENABLED}" == "true" ]]; then
+  kubectl -n "${PLATFORM_NS}" patch ingress portal-ingress --type merge -p "{
+    \"spec\": { \"tls\": [ { \"hosts\": [ \"${PORTAL_HOST}\" ], \"secretName\": \"${PORTAL_TLS_SECRET}\" } ] }
+  }" >/dev/null 2>&1 || true
+fi
+
+kubectl -n "${PLATFORM_NS}" rollout status "deploy/${PORTAL_UI_DEPLOY}" --timeout=300s
+log "[04][portal-ui] OK"

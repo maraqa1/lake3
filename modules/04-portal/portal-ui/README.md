@@ -1,34 +1,25 @@
-# OpenKPI Portal UI — Phase 1 (Aligned)
+# OpenKPI Portal UI (Phase 1) - Drop-in Module
 
-## Install
+This module deploys the OpenKPI Portal UI as a static nginx site in Kubernetes.
 
-From OpenKPI root:
+## What it deploys
+- ConfigMap containing `ui.tgz` (tarball of `./ui/`)
+- Deployment `portal-ui` (nginx) with initContainer that unpacks `ui.tgz`
+- Service `portal-ui:80`
+- Ingress `portal-ingress` routing:
+  - `/` -> `portal-ui:80`
+  - `/api` -> `portal-api:${PORTAL_API_PORT}`
 
+## Contract (env)
+Loaded from `/root/open-kpi.env` via `00-env.sh`:
+- PLATFORM_NS, INGRESS_CLASS
+- PORTAL_HOST, PORTAL_API_SVC, PORTAL_API_PORT
+- PORTAL_UI_* identifiers
+- TLS_MODE (off | per-host-http01 | wildcard) and PORTAL_TLS_SECRET (if TLS enabled)
+
+## Run
+From the module folder:
 ```bash
-cd modules/04-portal/portal-ui
 ./04-portal-ui.sh
-```
-
-## Tests
-
-```bash
-cd modules/04-portal/portal-ui
 ./04-portal-ui-tests.sh
-```
-
-## Expected URLs (from /root/open-kpi.env)
-
-- UI: `https://${PORTAL_HOST}/`
-- API (same host): `https://${PORTAL_HOST}/api/health`
-- API summary: `https://${PORTAL_HOST}/api/summary`
-- Catalog search: `https://${PORTAL_HOST}/api/catalog/search?q=<term>`
-- Catalog tables: `https://${PORTAL_HOST}/api/catalog/tables`
-
-## Troubleshooting (exact commands)
-
-```bash
-kubectl -n ${PLATFORM_NS} get deploy,svc,ingress -o wide
-kubectl -n ${PLATFORM_NS} describe ingress portal-ingress
-kubectl -n ${PLATFORM_NS} describe deploy portal-ui
-kubectl -n ${PLATFORM_NS} logs deploy/portal-ui --tail=200
 ```

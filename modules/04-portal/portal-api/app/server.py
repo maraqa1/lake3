@@ -1,150 +1,131 @@
-from flask import Flask, jsonify, request
-from .config import Config
-from .util.time import utc_now_iso
-from .probes.k8s_probe import k8s_summary
-from .probes.ingress_probe import ingress_links_and_inventory
-from .probes.postgres_probe import postgres_catalog_tables, postgres_search, postgres_summary
-from .probes.minio_probe import minio_summary
-from .probes.airbyte_probe import airbyte_summary
-from .probes.dbt_probe import dbt_summary
-from .probes.n8n_probe import n8n_summary
-from .probes.zammad_probe import zammad_summary
-from .probes.metabase_probe import metabase_summary
-from .probes.contract import compute_platform_status, operational_fraction, REQUIRED_SERVICES_ORDER
+\
+from __future__ import annotations
+
+import os
+import socket
+from datetime import datetime, timezone
+from typing import Any, Dict, List
+
+import requests
+from flask import Flask, jsonify
+from flask_cors import CORS
+
+from .services.k8s import k8s_summary
+from .services.health import check_postgres, check_minio, check_http
+
+APP_VERSION = os.environ.get("APP_VERSION", "phase1")
+
+def iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+def service_obj(name: str, status: str, reason: str, links: Dict[str, str] | None = None) -> Dict[str, Any]:
+    return {
+        "name": name,
+        "status": status,
+        "reason": reason,
+        "last_checked": iso_now(),
+        "links": links or {},
+    }
+
+def build_services() -> List[Dict[str, Any]]:
+    # Hosts are external, services are internal. UI uses external links, API checks internal where possible.
+    app_domain = os.environ.get("APP_DOMAIN", "")
+    portal_host = os.environ.get("PORTAL_HOST", "")
+
+    # external hosts (optional)
+    hosts = {
+        "postgres": os.environ.get("POSTGRES_HOST_EXT", f"postgres.{app_domain}" if app_domain else ""),
+        "minio": os.environ.get("MINIO_HOST_EXT", f"minio.{app_domain}" if app_domain else ""),
+        "airbyte": os.environ.get("AIRBYTE_HOST", ""),
+        "metabase": os.environ.get("METABASE_HOST", f"metabase.{app_domain}" if app_domain else ""),
+        "n8n": os.environ.get("N8N_HOST", f"n8n.{app_domain}" if app_domain else ""),
+        "zammad": os.environ.get("ZAMMAD_HOST", f"zammad.{app_domain}" if app_domain else ""),
+        "dbt": os.environ.get("DBT_HOST", f"dbt.{app_domain}" if app_domain else ""),
+        "portal": portal_host,
+    }
+
+    # internal endpoints for checks
+    pg_ok, pg_reason = check_postgres()
+    minio_ok, minio_reason = check_minio()
+
+    # best-effort HTTP checks (inside cluster)
+    # These are "INFO" grade: do not fail whole response if unreachable.
+    airbyte_ok, airbyte_reason = check_http("airbyte", os.environ.get("AIRBYTE_SVC_URL", ""))
+    metabase_ok, metabase_reason = check_http("metabase", os.environ.get("METABASE_SVC_URL", ""))
+    n8n_ok, n8n_reason = check_http("n8n", os.environ.get("N8N_SVC_URL", ""))
+    zammad_ok, zammad_reason = check_http("zammad", os.environ.get("ZAMMAD_SVC_URL", ""))
+
+    services: List[Dict[str, Any]] = []
+
+    services.append(service_obj(
+        "kubernetes",
+        "OPERATIONAL",
+        "",
+        links={"namespaces": "/api/k8s/summary"},
+    ))
+
+    services.append(service_obj(
+        "postgres",
+        "OPERATIONAL" if pg_ok else "DOWN",
+        "" if pg_ok else pg_reason,
+        links={"host": hosts["postgres"]} if hosts["postgres"] else {},
+    ))
+
+    services.append(service_obj(
+        "minio",
+        "OPERATIONAL" if minio_ok else "DOWN",
+        "" if minio_ok else minio_reason,
+        links={"host": hosts["minio"]} if hosts["minio"] else {},
+    ))
+
+    # Airbyte / Metabase / n8n / Zammad — keep represented even if not checkable
+    def status_from_http(ok: bool, reason: str) -> tuple[str, str]:
+        if ok:
+            return "OPERATIONAL", ""
+        if reason.startswith("not_configured"):
+            return "INFO", "no in-cluster endpoint configured"
+        return "DEGRADED", reason
+
+    st, rs = status_from_http(airbyte_ok, airbyte_reason)
+    services.append(service_obj("airbyte", st, rs, links={"host": hosts["airbyte"]} if hosts["airbyte"] else {}))
+
+    st, rs = status_from_http(metabase_ok, metabase_reason)
+    services.append(service_obj("metabase", st, rs, links={"host": hosts["metabase"]} if hosts["metabase"] else {}))
+
+    st, rs = status_from_http(n8n_ok, n8n_reason)
+    services.append(service_obj("n8n", st, rs, links={"host": hosts["n8n"]} if hosts["n8n"] else {}))
+
+    st, rs = status_from_http(zammad_ok, zammad_reason)
+    services.append(service_obj("zammad", st, rs, links={"host": hosts["zammad"]} if hosts["zammad"] else {}))
+
+    services.append(service_obj("dbt", "INFO", "dbt status is evidence-based (jobs/docs); not checked in phase 1",
+                                links={"host": hosts["dbt"]} if hosts["dbt"] else {}))
+
+    services.append(service_obj("portal", "OPERATIONAL", "", links={"host": hosts["portal"]} if hosts["portal"] else {}))
+    return services
 
 app = Flask(__name__)
+CORS(app)
 
 @app.get("/api/health")
-def health():
+def api_health():
     return jsonify({
         "status": "ok",
-        "generated_at": utc_now_iso(),
-        "service": "portal-api",
-        "version": "phase1",
+        "version": APP_VERSION,
+        "time": iso_now(),
+        "node": socket.gethostname(),
     })
 
 @app.get("/api/services")
-def services():
-    k8s = k8s_summary(Config)
-    ingress = ingress_links_and_inventory(Config, k8s)
-    pg = postgres_summary(Config)
-    s3 = minio_summary(Config)
-    ab = airbyte_summary(Config, ingress)
-    dbt = dbt_summary(Config, ingress, s3)
-    n8n = n8n_summary(Config, ingress)
-    zammad = zammad_summary(Config, ingress)
-    metabase = metabase_summary(Config, ingress)
-
-    services_map = {
-        "kubernetes": k8s["service"],
-        "postgres": pg["service"],
-        "minio": s3["service"],
-        "ingress_tls": ingress["service"],
-        "airbyte": ab["service"],
-        "dbt": dbt["service"],
-        "n8n": n8n["service"],
-        "zammad": zammad["service"],
-        "metabase": metabase["service"],
-    }
-    services_list = [services_map[name] for name in REQUIRED_SERVICES_ORDER]
-    return jsonify({"generated_at": utc_now_iso(), "services": services_list})
-
-@app.get("/api/catalog/tables")
-def catalog_tables():
-    page = max(int(request.args.get("page", "1")), 1)
-    page_size = min(max(int(request.args.get("page_size", "50")), 1), 200)
-    return jsonify(postgres_catalog_tables(Config, page=page, page_size=page_size))
-
-@app.get("/api/catalog/search")
-def catalog_search():
-    q = (request.args.get("q") or "").strip()
-    if not q:
-        return jsonify({"q": "", "matches": []})
-    return jsonify(postgres_search(Config, q=q))
-
-@app.get("/api/ingestion/airbyte")
-def ingestion_airbyte():
-    k8s = k8s_summary(Config)
-    ingress = ingress_links_and_inventory(Config, k8s)
-    return jsonify(airbyte_summary(Config, ingress))
-
-@app.get("/api/transform/dbt")
-def transform_dbt():
-    k8s = k8s_summary(Config)
-    ingress = ingress_links_and_inventory(Config, k8s)
-    s3 = minio_summary(Config)
-    return jsonify(dbt_summary(Config, ingress, s3))
-
-@app.get("/api/ops/n8n")
-def ops_n8n():
-    k8s = k8s_summary(Config)
-    ingress = ingress_links_and_inventory(Config, k8s)
-    return jsonify(n8n_summary(Config, ingress))
-
-@app.get("/api/itsm/zammad")
-def itsm_zammad():
-    k8s = k8s_summary(Config)
-    ingress = ingress_links_and_inventory(Config, k8s)
-    return jsonify(zammad_summary(Config, ingress))
-
-@app.get("/api/summary")
-def summary():
-    generated_at = utc_now_iso()
-
-    k8s = k8s_summary(Config)
-    ingress = ingress_links_and_inventory(Config, k8s)
-    pg_sum = postgres_summary(Config)
-    s3_sum = minio_summary(Config)
-    ab_sum = airbyte_summary(Config, ingress)
-    dbt_sum = dbt_summary(Config, ingress, s3_sum)
-    n8n_sum = n8n_summary(Config, ingress)
-    zammad_sum = zammad_summary(Config, ingress)
-    metabase_sum = metabase_summary(Config, ingress)
-
-    services_map = {
-        "kubernetes": k8s["service"],
-        "postgres": pg_sum["service"],
-        "minio": s3_sum["service"],
-        "ingress_tls": ingress["service"],
-        "airbyte": ab_sum["service"],
-        "dbt": dbt_sum["service"],
-        "n8n": n8n_sum["service"],
-        "zammad": zammad_sum["service"],
-        "metabase": metabase_sum["service"],
-    }
-    services_list = [services_map[name] for name in REQUIRED_SERVICES_ORDER]
-
-    platform_status = compute_platform_status(services_list)
-    op = operational_fraction(services_list)
-
-    assets = postgres_catalog_tables(Config, page=1, page_size=50)
-
-    links = ingress["links_contract"]
-    if not links.get("portal"):
-        links["portal"] = f"{Config.URL_SCHEME}://{Config.PORTAL_HOST}" if Config.PORTAL_HOST else ""
-
-    proof = {
-        "airbyte_last_sync": ab_sum.get("last_sync"),
-        "dbt_last_run": dbt_sum.get("last_run"),
-        "data_availability": {
-            "schemas": pg_sum["postgres"].get("schemas_count", 0),
-            "tables": pg_sum["postgres"].get("tables_count", 0),
-        },
-    }
-
+def api_services():
     return jsonify({
-        "generated_at": generated_at,
-        "platform_status": platform_status,
-        "operational": op,
-        "links": links,
-        "services": services_list,
-        "k8s": k8s["k8s"],
-        "postgres": pg_sum["postgres"],
-        "assets": assets,
-        "proof": proof,
+        "time": iso_now(),
+        "services": build_services(),
     })
 
-if __name__ == "__main__":
-    import os
-    port = int(os.getenv("PORT", "8000"))
-    app.run(host="0.0.0.0", port=port)
+@app.get("/api/k8s/summary")
+def api_k8s_summary():
+    return jsonify({
+        "time": iso_now(),
+        "summary": k8s_summary(),
+    })

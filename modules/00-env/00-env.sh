@@ -186,3 +186,41 @@ if tls_enabled; then
 fi
 
 log "OK (env loaded, kubeconfig ready, kubectl+helm ready)"
+
+# ---- 00-env.sh DROP-IN: n8n secret bootstrap (add near the end, after kubectl_k is defined) ----
+: "${AUTO_BOOTSTRAP_APP_SECRETS:=on}"
+
+if [[ "${AUTO_BOOTSTRAP_APP_SECRETS}" != "off" ]]; then
+  : "${N8N_NS:=n8n}"
+  : "${N8N_SECRET_NAME:=n8n-secret}"
+  : "${N8N_SECRET_KEY:=db-password}"
+  : "${N8N_DB_PASSWORD:=${POSTGRES_PASSWORD}}"
+
+  kubectl_k get ns "${N8N_NS}" >/dev/null 2>&1 || kubectl_k create ns "${N8N_NS}" >/dev/null
+
+  kubectl_k -n "${N8N_NS}" get secret "${N8N_SECRET_NAME}" >/dev/null 2>&1 || \
+    kubectl_k -n "${N8N_NS}" create secret generic "${N8N_SECRET_NAME}" \
+      --from-literal="${N8N_SECRET_KEY}=${N8N_DB_PASSWORD}" >/dev/null
+fi
+
+# ------------------------------------------------------------------------------
+# Canonical Postgres secret (required by app modules, e.g., Metabase)
+# Ensures: ${OPENKPI_NS}/openkpi-postgres-secret with keys: host port username password db
+# ------------------------------------------------------------------------------
+: "${AUTO_BOOTSTRAP_APP_SECRETS:=on}"
+
+if [[ "${AUTO_BOOTSTRAP_APP_SECRETS}" != "off" ]]; then
+  kubectl_k -n "${OPENKPI_NS}" apply -f - <<YAML
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openkpi-postgres-secret
+type: Opaque
+stringData:
+  host: "${OPENKPI_PG_HOST:-${POSTGRES_SERVICE}}"
+  port: "${OPENKPI_PG_PORT:-${POSTGRES_PORT:-5432}}"
+  username: "${OPENKPI_PG_USER:-${POSTGRES_USER}}"
+  password: "${OPENKPI_PG_PASSWORD:-${POSTGRES_PASSWORD}}"
+  db: "${OPENKPI_PG_DB:-${POSTGRES_DB}}"
+YAML
+fi

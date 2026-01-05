@@ -47,13 +47,20 @@ PG_ADMIN_USER="${POSTGRES_USER:?missing POSTGRES_USER}"
 PG_ADMIN_PASS="${POSTGRES_PASSWORD:?missing POSTGRES_PASSWORD}"
 
 # n8n app contract
+# n8n app contract
 N8N_DB_NAME="${N8N_DB_NAME:-n8n}"
 N8N_DB_USER="${N8N_DB_USER:-n8n}"
-N8N_DB_PASS="${N8N_DB_PASS:-${N8N_PASS:?missing N8N_PASS}}"
+
+# DB password must be stable and independent from UI/basic-auth password
+N8N_DB_PASS="${N8N_DB_PASS:?missing N8N_DB_PASS}"
+
+# Basic auth (UI login)
 N8N_BASIC_AUTH_USER="${N8N_BASIC_AUTH_USER:-admin}"
-N8N_BASIC_AUTH_PASS="${N8N_PASS:?missing N8N_PASS}"
+N8N_BASIC_AUTH_PASS="${N8N_BASIC_AUTH_PASS:-${N8N_PASS:?missing N8N_PASS}}"
+
 N8N_ENCRYPTION_KEY="${N8N_ENCRYPTION_KEY:?missing N8N_ENCRYPTION_KEY}"
 N8N_IMAGE="${N8N_IMAGE:-n8nio/n8n:1.86.0}"
+
 
 APP_LABEL_KEY="app.kubernetes.io/name"
 APP_LABEL_VAL="n8n"
@@ -67,6 +74,48 @@ kind: Namespace
 metadata:
   name: ${NS}
 YAML
+
+# ------------------------------------------------------------------------------
+# 02) Secrets + PVC
+# ------------------------------------------------------------------------------
+log "[${MODULE_ID}][n8n] apply secret + pvc"
+
+kubectl_k -n "${NS}" apply -f - <<YAML
+apiVersion: v1
+kind: Secret
+metadata:
+  name: n8n-secret
+type: Opaque
+stringData:
+  # DB
+  db-host: "${PG_SVC}"
+  db-port: "${PG_PORT}"
+  db-name: "${N8N_DB_NAME}"
+  db-user: "${N8N_DB_USER}"
+  db-password: "${N8N_DB_PASS}"
+
+  # App auth/encryption
+  n8n-basic-user: "${N8N_BASIC_AUTH_USER}"
+  n8n-basic-pass: "${N8N_BASIC_AUTH_PASS}"
+  n8n-encryption-key: "${N8N_ENCRYPTION_KEY}"
+
+  # Public URL
+  n8n-host: "${N8N_HOST}"
+  n8n-protocol: "${URL_SCHEME}"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-data-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: "${STORAGE_CLASS:-local-path}"
+  resources:
+    requests:
+      storage: "${N8N_PVC_SIZE:-5Gi}"
+YAML
+
+
 
 # ------------------------------------------------------------------------------
 # 01) Bootstrap Postgres objects (Job; repeatable; fail-fast)
@@ -173,45 +222,6 @@ POD="$(kubectl -n "${NS}" get pods -l job-name="${BOOT_JOB}" -o jsonpath='{.item
 kubectl -n "${NS}" logs "${POD}" -c psql --tail=200 || true
 kubectl -n "${NS}" delete job "${BOOT_JOB}" --ignore-not-found >/dev/null 2>&1 || true
 
-# ------------------------------------------------------------------------------
-# 02) Secrets + PVC
-# ------------------------------------------------------------------------------
-log "[${MODULE_ID}][n8n] apply secret + pvc"
-
-kubectl_k -n "${NS}" apply -f - <<YAML
-apiVersion: v1
-kind: Secret
-metadata:
-  name: n8n-secret
-type: Opaque
-stringData:
-  # DB
-  db-host: "${PG_SVC}"
-  db-port: "${PG_PORT}"
-  db-name: "${N8N_DB_NAME}"
-  db-user: "${N8N_DB_USER}"
-  db-password: "${N8N_DB_PASS}"
-
-  # App auth/encryption
-  n8n-basic-user: "${N8N_BASIC_AUTH_USER}"
-  n8n-basic-pass: "${N8N_BASIC_AUTH_PASS}"
-  n8n-encryption-key: "${N8N_ENCRYPTION_KEY}"
-
-  # Public URL
-  n8n-host: "${N8N_HOST}"
-  n8n-protocol: "${URL_SCHEME}"
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: n8n-data-pvc
-spec:
-  accessModes: ["ReadWriteOnce"]
-  storageClassName: "${STORAGE_CLASS:-local-path}"
-  resources:
-    requests:
-      storage: "${N8N_PVC_SIZE:-5Gi}"
-YAML
 
 # ------------------------------------------------------------------------------
 # 03) Deployment + Service

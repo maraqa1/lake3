@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OpenKPI Control Portal</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div class="title">
+        <div class="h1">OpenKPI Control Portal</div>
+        <div class="sub" id="subtitle">Unified control plane</div>
+      </div>
+      <div class="top-right">
+        <div class="pill" id="apiPill">API: unknown</div>
+        <div class="pill ghost" id="lastGen">—</div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="catalog">Catalog</button>
+      <button class="tab" data-tab="ingestion">Ingestion</button>
+      <button class="tab" data-tab="decisioning">Decisioning</button>
+      <button class="tab" data-tab="tickets">Tickets</button>
+      <button class="tab" data-tab="ops">Ops</button>
+    </div>
+
+    <main id="view"></main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

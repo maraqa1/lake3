@@ -1,0 +1,8 @@
+# OpenKPI Portal API (Phase 1)
+# Keep minimal + pinned to avoid drift.
+flask==3.0.3
+requests==2.32.3
+kubernetes==30.1.0
+psycopg2-binary==2.9.9
+boto3==1.34.162
+botocore==1.34.162

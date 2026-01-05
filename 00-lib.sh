@@ -18,3 +18,9 @@ retry(){
     sleep "$sleep_s"
   done
 }
+
+# ensure namespace exists
+ns_ensure() {
+  local ns="$1"
+  kubectl get ns "${ns}" >/dev/null 2>&1 || kubectl create ns "${ns}" >/dev/null
+}

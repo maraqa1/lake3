@@ -1,3 +1,8 @@
 # generated helm values (local)
 .values-*.yaml
 .values-*.yml
+
+# local artifacts
+_archive/
+*.bak.*
+*.zip

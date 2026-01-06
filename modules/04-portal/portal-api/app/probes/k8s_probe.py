@@ -81,7 +81,7 @@ def k8s_summary(Cfg) -> Dict[str, Any]:
                     "statefulsets": {"ready": sts_ready, "total": sts_total},
                 },
                 "restarts_total": restarts_total,
-                "ingresses": [],
+                "ingresses": _collect_ingresses(mode),
             },
             "raw": {"ingresses_count": ing_count},
         }
@@ -94,4 +94,63 @@ def k8s_summary(Cfg) -> Dict[str, Any]:
             evidence_type="k8s",
             evidence_details={"error": str(e), "config_mode": mode},
         )
-        return {"service": svc, "k8s": {"namespaces": [], "workloads": {}, "restarts_total": 0, "ingresses": []}, "raw": {}}
+        return {"service": svc, "k8s": {"namespaces": [], "workloads": {}, "restarts_total": 0, "ingresses": _collect_ingresses(mode)}, "raw": {}}
+
+
+
+
+
+def _collect_ingresses(mode: str = "auto"):
+    """
+    Return list of ingress rows: namespace, name, host, path, service, service_port
+
+    mode:
+      - "incluster": load_incluster_config()
+      - "kubeconfig": load_kube_config()
+      - "auto": try incluster then kubeconfig
+    """
+    from kubernetes import client, config
+
+    if mode == "incluster":
+        config.load_incluster_config()
+    elif mode == "kubeconfig":
+        config.load_kube_config()
+    else:
+        try:
+            config.load_incluster_config()
+        except Exception:
+            config.load_kube_config()
+
+    rows = []
+    net = client.NetworkingV1Api()
+    items = (net.list_ingress_for_all_namespaces().items or [])
+    for ing in items:
+        ns = (getattr(ing.metadata, "namespace", "") or "")
+        name = (getattr(ing.metadata, "name", "") or "")
+        spec = getattr(ing, "spec", None)
+        if not spec:
+            continue
+        rules = getattr(spec, "rules", None) or []
+        for r in rules:
+            host = getattr(r, "host", "") or ""
+            http = getattr(r, "http", None)
+            paths = getattr(http, "paths", None) or []
+            for ph in paths:
+                path = getattr(ph, "path", None) or "/"
+                backend = getattr(ph, "backend", None)
+                svc = getattr(backend, "service", None) if backend else None
+                if not svc:
+                    continue
+                svc_name = getattr(svc, "name", "") or ""
+                port_obj = getattr(svc, "port", None)
+                port = getattr(port_obj, "number", None) or getattr(port_obj, "name", None) or ""
+                rows.append({
+                    "namespace": ns,
+                    "name": name,
+                    "host": host,
+                    "path": path,
+                    "service": svc_name,
+                    "service_port": port,
+                })
+    return rows
+

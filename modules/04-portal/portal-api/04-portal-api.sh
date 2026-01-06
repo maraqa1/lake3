@@ -4,7 +4,7 @@ set -euo pipefail
 # ==============================================================================
 # 04-portal-api.sh — Deploy OpenKPI Portal API (Phase 1) [REPEATABLE]
 # - Packages app/ as app.tgz -> ConfigMap -> initContainer extracts into /app
-# - Runs: python -m app.server (package name "app")
+# - Runs: exec gunicorn -b 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 30 app.server:app (package name "app")
 # - Repeatable: kubectl apply; ConfigMap replaced every run
 # ==============================================================================
 
@@ -267,11 +267,15 @@ spec:
               set -euo pipefail
               python -m pip install --no-cache-dir -r /requirements/requirements.txt >/dev/null
               cd /app
-              python -m app.server
+              exec gunicorn -b 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 30 app.server:app
           readinessProbe:
             httpGet: { path: /api/health, port: ${PORT} }
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 10
+          startupProbe:
+            httpGet: { path: /api/health, port: ${PORT} }
+            failureThreshold: 30
+            periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 6
           livenessProbe:

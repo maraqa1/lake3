@@ -1,8 +1,30 @@
-# generated helm values (local)
-.values-*.yaml
-.values-*.yml
-
-# local artifacts
-_archive/
-*.bak.*
+# build artifacts
+*.tgz
+*.tar.gz
 *.zip
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+.env.*
+
+# node/ui
+node_modules/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# local backups / copies
+*.bak
+*.broken.*
+*.BAK/
+*_1/
+*_1.DISABLED/

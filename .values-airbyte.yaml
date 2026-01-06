@@ -1,0 +1,84 @@
+global:
+  deploymentMode: oss
+
+  # External Postgres (OpenKPI)
+  database:
+    type: external
+    host: openkpi-postgres.open-kpi.svc.cluster.local
+    port: 5432
+    database: db-airbyte
+    secretName: airbyte-config-secrets
+    userSecretKey: database-user
+    passwordSecretKey: database-password
+
+webapp:
+  ingress:
+    enabled: false
+
+# Critical: do NOT deploy chart minio/postgres
+minio:
+  enabled: false
+postgresql:
+  enabled: false
+
+server:
+  extraEnvFrom:
+    - configMapRef:
+        name: airbyte-s3-config
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: s3-access-key-id
+          optional: false
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: s3-secret-access-key
+          optional: false
+
+worker:
+  extraEnvFrom:
+    - configMapRef:
+        name: airbyte-s3-config
+  extraEnv:
+    - name: AWS_ACCESS_KEY_ID
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: s3-access-key-id
+          optional: false
+    - name: AWS_SECRET_ACCESS_KEY
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: s3-secret-access-key
+          optional: false
+
+# Temporal MUST use OpenKPI Postgres and SSL off
+temporal:
+  extraEnv:
+    - name: POSTGRES_SEEDS
+      value: openkpi-postgres.open-kpi.svc.cluster.local
+    - name: DB_PORT
+      value: "5432"
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: database-user
+    - name: POSTGRES_PWD
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: database-password
+    - name: POSTGRES_TLS_ENABLED
+      value: "false"
+    - name: SQL_TLS_ENABLED
+      value: "false"
+    - name: POSTGRES_TLS_DISABLE_HOST_VERIFICATION
+      value: "true"
+    - name: SQL_TLS_DISABLE_HOST_VERIFICATION
+      value: "true"

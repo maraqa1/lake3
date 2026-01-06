@@ -1,0 +1,16 @@
+global:
+  deploymentMode: oss
+
+# internal DB ON
+postgresql:
+  enabled: true
+
+# try both disable styles (chart variants)
+minio:
+  enabled: false
+globalMinio:
+  enabled: false
+
+webapp:
+  ingress:
+    enabled: false

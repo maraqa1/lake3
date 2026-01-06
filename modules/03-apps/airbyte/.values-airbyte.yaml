@@ -1,0 +1,55 @@
+global:
+  deploymentMode: oss
+  database:
+    type: external
+    host: openkpi-postgres.open-kpi.svc.cluster.local
+    port: 5432
+    database: db-airbyte
+    secretName: airbyte-config-secrets
+    userSecretKey: database-user
+    passwordSecretKey: database-password
+
+postgresql:
+  enabled: false
+
+minio:
+  enabled: false
+
+logs:
+  minio:
+    enabled: false
+
+webapp:
+  ingress:
+    enabled: false
+
+server:
+  extraEnvFrom:
+    - configMapRef:
+        name: airbyte-s3-config
+
+worker:
+  extraEnvFrom:
+    - configMapRef:
+        name: airbyte-s3-config
+
+temporal:
+  extraEnv:
+    - name: POSTGRES_SEEDS
+      value: openkpi-postgres.open-kpi.svc.cluster.local
+    - name: DB_PORT
+      value: "5432"
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: database-user
+    - name: POSTGRES_PWD
+      valueFrom:
+        secretKeyRef:
+          name: airbyte-config-secrets
+          key: database-password
+    - name: POSTGRES_TLS_ENABLED
+      value: "false"
+    - name: SQL_TLS_ENABLED
+      value: "false"

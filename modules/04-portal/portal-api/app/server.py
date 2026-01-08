@@ -5,6 +5,9 @@ import os
 from .config import Config
 from .util.time import utc_now_iso
 
+from app.util.dbt_catalog_minio import list_dbt_projects, get_dbt_catalog_assets
+
+
 from .probes.k8s_probe import k8s_summary
 from .probes.ingress_probe import ingress_links_and_inventory
 from .probes.postgres_probe import postgres_catalog_tables, postgres_search, postgres_summary
@@ -23,6 +26,8 @@ from .probes.contract import (
 )
 
 app = Flask(__name__)
+
+Cfg = Config()
 
 def _ensure_dict(x):
     return x if isinstance(x, dict) else {}
@@ -323,28 +328,29 @@ def catalog_tables():
     page_size = _as_int(request.args.get("page_size"), 50)
     return jsonify(postgres_catalog_tables(Config, page=page, page_size=page_size))
 
-
 @app.get("/api/search")
-def search():
-    # UI contract: /api/search must work with empty q.
-    q = (request.args.get("q") or "").strip()
-    page = _as_int(request.args.get("page"), 1)
-    page_size = _as_int(request.args.get("page_size"), 50)
+def api_search():
+    q = request.args.get("q", "") or ""
+    project = request.args.get("project", "") or ""
+    page = int(request.args.get("page", "1") or "1")
+    page_size = int(request.args.get("page_size", "50") or "50")
 
-    if not q:
-        cat = postgres_catalog_tables(Config, page=page, page_size=page_size)
-        tables = cat.get("tables") or []
-        pagination = cat.get("pagination") or {"page": page, "page_size": page_size, "total": 0}
-        ui_tables = [
-            {"schema": t.get("schema", ""), "table": t.get("table", ""), "rows": 0, "last_update": "", "owner": ""}
-            for t in tables
-        ]
-        return jsonify({"assets": {"tables": ui_tables, "pagination": pagination}})
+    if not project:
+        project = getattr(Cfg, "DBT_DEFAULT_PROJECT", "his_dmo")
 
-    res = postgres_search(Config, q)
-    matches = res.get("matches") or []
-    ui_tables = [{"schema": m.get("schema", ""), "table": m.get("table", ""), "rows": 0, "last_update": "", "owner": ""} for m in matches]
-    return jsonify({"assets": {"tables": ui_tables, "pagination": {"page": 1, "page_size": 50, "total": len(ui_tables)}}, "q": q})
+    try:
+        assets, ev = get_dbt_catalog_assets(Cfg, project=project, q=q, page=page, page_size=page_size)
+        return jsonify({"assets": assets, "dbt": {"mode": "minio", "evidence": ev}})
+    except Exception as e:
+        # keep contract stable: never 500 the UI
+        return jsonify(
+            {
+                "assets": {"pagination": {"page": page, "page_size": page_size, "total": 0}, "tables": []},
+                "dbt": {"mode": "minio", "error": str(e), "project": project},
+            }
+        ), 200
+
+
 
 
 @app.get("/api/k8s/summary")
@@ -357,3 +363,7 @@ def k8s_summary_endpoint():
 if __name__ == "__main__":
     # Fallback dev server (production uses gunicorn from the module script)
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
+    
+@app.get("/api/dbt/projects")
+def api_dbt_projects():
+    return jsonify(list_dbt_projects(Cfg))

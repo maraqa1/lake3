@@ -57,3 +57,10 @@ th{background:#f8fafc;text-align:left;font-weight:800}
 .filterRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .input{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;font-size:12px;min-width:280px}
 .small{color:var(--muted);font-size:12px}
+
+.bucketGrid { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.bucketPill { padding:6px 10px; border:1px solid rgba(0,0,0,.08); border-radius:999px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12.5px; background: rgba(255,255,255,.6); }
+
+/* DEBUG: force visibility */
+/*.bucketGrid { border: 3px solid red; padding: 8px; min-height: 24px; display:flex; flex-wrap:wrap;/* gap:8px; }
+.bucketPill { border: 3px solid blue; padding: 6px 10px; border-radius: 999px; }*/

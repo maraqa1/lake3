@@ -256,6 +256,10 @@ spec:
               valueFrom: { secretKeyRef: { name: portal-api-minio, key: MINIO_ROOT_USER, optional: true } }
             - name: MINIO_ROOT_PASSWORD
               valueFrom: { secretKeyRef: { name: portal-api-minio, key: MINIO_ROOT_PASSWORD, optional: true } }
+            - name: MINIO_ENDPOINT
+              value: "http://openkpi-minio.open-kpi.svc.cluster.local:9000"
+            - name: MINIO_SECURE
+              value: "false"
           volumeMounts:
             - name: app
               mountPath: /app
@@ -265,7 +269,7 @@ spec:
           args:
             - |
               set -euo pipefail
-              python -m pip install --no-cache-dir -r /requirements/requirements.txt >/dev/null
+              python3 -m pip install --no-cache-dir -r /requirements/requirements.txt >/dev/null
               cd /app
               exec gunicorn -b 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 30 app.server:app
           readinessProbe:

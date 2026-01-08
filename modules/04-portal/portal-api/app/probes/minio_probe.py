@@ -30,8 +30,14 @@ def minio_summary(Cfg) -> Dict[str, Any]:
             aws_access_key_id=Cfg.MINIO_ROOT_USER,
             aws_secret_access_key=Cfg.MINIO_ROOT_PASSWORD,
             region_name=Cfg.AIRBYTE_S3_REGION,
-            config=BotoCfg(s3={"addressing_style": "path"}),
+            config=BotoCfg(
+                s3={"addressing_style": "path"},
+                connect_timeout=3,
+                read_timeout=5,
+                retries={"max_attempts": 1, "mode": "standard"},
+            ),
         )
+
         resp = s3.list_buckets()
         buckets = resp.get("Buckets", []) or []
         out = [{"name": b.get("Name", ""), "creation_date": (b.get("CreationDate").isoformat() if b.get("CreationDate") else None)} for b in buckets]

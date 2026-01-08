@@ -1,3 +1,10 @@
+// DROP-IN app.js (replace entire file)
+// Fixes:
+// - Removes duplicate fetchDbtProjects()
+// - Fixes undefined `tab` reference
+// - Prevents render↔tickAssets recursion
+// - Adds stable catalog polling + debounced filter
+// - Keeps MinIO buckets in dedicated "Storage / MinIO" card using /api/summary services[].evidence.details.sample[]
 (() => {
   const API = "/api";
   const view = document.getElementById("view");
@@ -5,15 +12,36 @@
   const lastGen = document.getElementById("lastGen");
   const tabs = Array.from(document.querySelectorAll(".tab"));
 
-  let state = { tab: "overview", summary: null, assets: null, filter: "" };
+  let state = {
+    tab: "overview",
+    summary: null,
+    assets: null,
+    filter: "",
+    dbtProjects: [],
+    dbtProject: "his_dmo",
+    page: 1,
+    pageSize: 50,
+  };
 
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let catalogFilterTimer = null;
+  let summaryTimer = null;
+  let assetsTimer = null;
+
+  const esc = (s) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[c]));
+
   const badgeCls = (st) => {
-    st = String(st||"").toUpperCase();
-    if (st==="OPERATIONAL") return "badge ok";
-    if (st==="DEGRADED") return "badge warn";
-    if (st==="DOWN") return "badge down";
-    if (st==="INFO") return "badge info";
+    st = String(st || "").toUpperCase();
+    if (st === "OPERATIONAL") return "badge ok";
+    if (st === "DEGRADED") return "badge warn";
+    if (st === "DOWN") return "badge down";
+    if (st === "INFO") return "badge info";
     return "badge unk";
   };
 
@@ -27,7 +55,7 @@
       n8n: "Automation workflows; API auth optional.",
       zammad: "Ticketing portal; UI + API reachability.",
       ingress_tls: "Ingress routing and TLS scheme checks.",
-      kubernetes: "Cluster workloads, namespaces, ingresses, restarts."
+      kubernetes: "Cluster workloads, namespaces, ingresses, restarts.",
     };
     return map[name] || "Service health and evidence.";
   }
@@ -39,10 +67,10 @@
     const extra = [];
 
     if (svc.name === "dbt") {
-      const portalHost = summary?.k8s?.ingresses?.find(x => x.name==="dbt-docs-ingress")?.host;
-      if (portalHost) extra.push({label:"Docs (portal)", href:`https://${portalHost}/dbt/docs/his_dmo/`});
-      if (top.dbt_docs) extra.push({label:"Docs", href:top.dbt_docs});
-      if (top.dbt_lineage) extra.push({label:"Lineage", href:top.dbt_lineage});
+      const portalHost = summary?.k8s?.ingresses?.find((x) => x.name === "dbt-docs-ingress")?.host;
+      if (portalHost) extra.push({ label: "Docs (portal)", href: `https://${portalHost}/dbt/docs/${state.dbtProject || "his_dmo"}/` });
+      if (top.dbt_docs) extra.push({ label: "Docs", href: top.dbt_docs });
+      if (top.dbt_lineage) extra.push({ label: "Lineage", href: top.dbt_lineage });
     }
 
     return { ui, api, extra };
@@ -100,16 +128,18 @@
       </div>
     `;
 
-    const services = Array.isArray(summary.services) ? summary.services : [];
-    const order = ["postgres","minio","airbyte","dbt","metabase","n8n","zammad","ingress_tls","kubernetes"];
-    services.sort((a,b)=> order.indexOf(a.name)-order.indexOf(b.name));
+    const services = Array.isArray(summary.services) ? summary.services.slice() : [];
+    const order = ["postgres", "minio", "airbyte", "dbt", "metabase", "n8n", "zammad", "ingress_tls", "kubernetes"];
+    services.sort((a, b) => (order.indexOf(a.name) - order.indexOf(b.name)));
 
-    const svcCards = services.map(s => {
+    const svcCards = services.map((s) => {
       const links = svcLinks(summary, s);
       const btns = [];
       if (links.ui) btns.push(`<a class="btn" href="${esc(links.ui)}" target="_blank" rel="noreferrer">Open</a>`);
       if (links.api) btns.push(`<a class="btn" href="${esc(links.api)}" target="_blank" rel="noreferrer">API</a>`);
-      links.extra.forEach(x => btns.push(`<a class="btn" href="${esc(x.href)}" target="_blank" rel="noreferrer">${esc(x.label)}</a>`));
+      links.extra.forEach((x) =>
+        btns.push(`<a class="btn" href="${esc(x.href)}" target="_blank" rel="noreferrer">${esc(x.label)}</a>`)
+      );
 
       return `
         <div class="svcCard">
@@ -144,58 +174,14 @@
       <div class="svcGrid">${svcCards}</div>
       <div class="sectionTitle"><div class="t">Operational proof</div><div class="s">From API summary</div></div>
       ${proof}
-    `;
-  }
-
-  function renderCatalog(summary, assets) {
-    const tables = assets?.tables || [];
-    const q = state.filter.trim().toLowerCase();
-
-    const filtered = q
-      ? tables.filter(t =>
-          String(t.schema||"").toLowerCase().includes(q) ||
-          String(t.table||"").toLowerCase().includes(q) ||
-          String(t.owner||"").toLowerCase().includes(q)
-        )
-      : tables;
-
-    const rows = filtered.map(t => `
-      <tr>
-        <td>${esc(t.schema || "")}</td>
-        <td>${esc(t.table || "")}</td>
-        <td>${esc(t.rows ?? "")}</td>
-        <td>${esc(t.last_update ?? "")}</td>
-        <td>${esc(t.owner ?? "")}</td>
-      </tr>
-    `).join("");
-
-    return `
-      <div class="card">
-        <div class="hd"><div style="font-weight:900">Data assets</div><div class="small">Catalog snapshot</div></div>
-        <div class="bd">
-          <div class="filterRow">
-            <input class="input" id="filter" placeholder="Filter by schema / table / owner" value="${esc(state.filter)}"/>
-            <span class="small">Total: ${esc(assets?.pagination?.total ?? tables.length)}</span>
-          </div>
-
-          <div class="tableWrap">
-            <table>
-              <thead>
-                <tr><th>Schema</th><th>Table</th><th>Rows</th><th>Last update</th><th>Owner</th></tr>
-              </thead>
-              <tbody>
-                ${rows || `<tr><td colspan="5" class="small">No rows</td></tr>`}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+      <div class="sectionTitle"><div class="t">Storage</div><div class="s">MinIO</div></div>
+      <div class="card" id="minioBucketsCard"></div>
     `;
   }
 
   function renderOps(summary) {
     const ing = summary?.k8s?.ingresses || [];
-    const rows = ing.map(x => `
+    const rows = ing.map((x) => `
       <tr>
         <td>${esc(x.namespace)}</td>
         <td>${esc(x.name)}</td>
@@ -220,27 +206,106 @@
     `;
   }
 
-  function render() {
-    const s = state.summary;
-    if (!s) {
-      view.innerHTML = `<div class="card"><div class="bd"><div class="small">Loading…</div></div></div>`;
-      return;
-    }
+  function renderCatalogShell() {
+    const total = (state.assets?.pagination?.total != null)
+      ? state.assets.pagination.total
+      : (state.assets?.tables?.length ?? 0);
 
-    if (state.tab === "overview") view.innerHTML = renderOverview(s);
-    else if (state.tab === "catalog") view.innerHTML = renderCatalog(s, state.assets || s.assets);
-    else if (state.tab === "ops") view.innerHTML = renderOps(s);
-    else view.innerHTML = `<div class="card"><div class="bd"><div class="small">Placeholder tab: ${esc(state.tab)}</div></div></div>`;
+    return `
+      <div class="card">
+        <div class="hd">
+          <div style="font-weight:900">Data assets</div>
+          <div class="small">Catalog snapshot (dbt project)</div>
+        </div>
+        <div class="bd">
+          <div class="filterRow" style="gap:10px;align-items:center">
+            <input class="input" id="filter" placeholder="Filter by schema / table / owner" value="${esc(state.filter)}"/>
+            <select class="input" id="dbtProject" style="max-width:260px">
+              ${(state.dbtProjects || []).map((p) => `<option value="${esc(p)}"${p === state.dbtProject ? " selected" : ""}>${esc(p)}</option>`).join("")}
+            </select>
+            <span class="small" id="catalogTotal">Total: ${esc(total)}</span>
+          </div>
 
-    const filter = document.getElementById("filter");
-    if (filter) {
-      filter.addEventListener("input", (e) => {
-        state.filter = e.target.value || "";
-        render();
-      });
-    }
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr><th>Schema</th><th>Table</th><th>Rows</th><th>Last update</th><th>Owner</th></tr>
+              </thead>
+              <tbody id="catalogBody">
+                <tr><td colspan="5" class="small">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
-    document.querySelectorAll("[data-nav]").forEach(a => {
+  function updateCatalogRows() {
+    const tbody = document.getElementById("catalogBody");
+    const totalEl = document.getElementById("catalogTotal");
+    if (!tbody) return;
+
+    const tables = state.assets?.tables || [];
+    const total = (state.assets?.pagination?.total != null) ? state.assets.pagination.total : tables.length;
+    if (totalEl) totalEl.textContent = `Total: ${total}`;
+
+    const q = String(state.filter || "").trim().toLowerCase();
+    const filtered = q
+      ? tables.filter((t) =>
+          String(t.schema || "").toLowerCase().includes(q) ||
+          String(t.table || "").toLowerCase().includes(q) ||
+          String(t.owner || "").toLowerCase().includes(q)
+        )
+      : tables;
+
+    const rows = filtered.map((t) => `
+      <tr>
+        <td>${esc(t.schema || "")}</td>
+        <td>${esc(t.table || "")}</td>
+        <td>${esc(t.rows ?? "")}</td>
+        <td>${esc(t.last_update ?? "")}</td>
+        <td>${esc(t.owner ?? "")}</td>
+      </tr>
+    `).join("");
+
+    tbody.innerHTML = rows || `<tr><td colspan="5" class="small">No rows</td></tr>`;
+  }
+
+  function renderMinioBucketsFromSummary(summary) {
+    const el = document.getElementById("minioBucketsCard");
+    if (!el) return;
+
+    const services = Array.isArray(summary.services) ? summary.services : [];
+    const minio = services.find((x) => x && x.name === "minio") || {};
+    const details = ((minio.evidence || {}).details || {});
+    const sample = Array.isArray(details.sample) ? details.sample : [];
+
+    const pills = sample.map((b) => {
+      const n = b?.name;
+      const d = b?.creation_date;
+      if (!n) return "";
+      return `<div class="bucketPill" title="${esc(d || "")}">${esc(n)}</div>`;
+    }).filter(Boolean).join("");
+
+    const count = (details.bucket_count != null) ? details.bucket_count : sample.length;
+
+    el.innerHTML = `
+      <div class="hd">
+        <div style="font-weight:900">MinIO Buckets</div>
+        <div class="${badgeCls(minio.status)}">${esc(minio.status || "INFO")}</div>
+      </div>
+      <div class="bd">
+        <div class="small">Count: <b>${esc(count)}</b></div>
+        <div class="bucketGrid" style="margin-top:10px">
+          ${pills || `<div class="small">No buckets</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  function bindNavHandlers() {
+    document.querySelectorAll("[data-nav]").forEach((a) => {
       a.addEventListener("click", (e) => {
         e.preventDefault();
         setTab(e.target.getAttribute("data-nav"));
@@ -248,10 +313,66 @@
     });
   }
 
+  function bindCatalogHandlers() {
+    const filter = document.getElementById("filter");
+    if (filter) {
+      filter.value = state.filter || "";
+      filter.oninput = (e) => {
+        state.filter = e.target.value || "";
+        clearTimeout(catalogFilterTimer);
+        catalogFilterTimer = setTimeout(() => tickAssets(true), 250);
+      };
+    }
+
+    const sel = document.getElementById("dbtProject");
+    if (sel) {
+      sel.value = state.dbtProject || "";
+      sel.onchange = async (e) => {
+        state.dbtProject = e.target.value || "his_dmo";
+        state.assets = null;
+        await tickAssets(true);
+      };
+    }
+  }
+
+  function render() {
+    const s = state.summary;
+
+    if (!s) {
+      view.innerHTML = `<div class="card"><div class="bd"><div class="small">Loading…</div></div></div>`;
+      return;
+    }
+
+    if (state.tab === "overview") {
+      view.innerHTML = renderOverview(s);
+      renderMinioBucketsFromSummary(s);
+      bindNavHandlers();
+      return;
+    }
+
+    if (state.tab === "catalog") {
+      view.innerHTML = renderCatalogShell();
+      bindCatalogHandlers();
+      updateCatalogRows();
+      bindNavHandlers();
+      return;
+    }
+
+    if (state.tab === "ops") {
+      view.innerHTML = renderOps(s);
+      bindNavHandlers();
+      return;
+    }
+
+    view.innerHTML = `<div class="card"><div class="bd"><div class="small">Placeholder tab: ${esc(state.tab)}</div></div></div>`;
+    bindNavHandlers();
+  }
+
   function setTab(tab) {
     state.tab = tab;
-    tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === tab));
+    tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
     render();
+    if (tab === "catalog") tickAssets(true);
   }
 
   async function fetchSummary() {
@@ -260,10 +381,46 @@
     return r.json();
   }
 
-  async function fetchSearch() {
-    const r = await fetch(`${API}/search?q=&page=1&page_size=50`, { cache: "no-store" });
+  async function fetchDbtProjects() {
+    const r = await fetch(`${API}/dbt/projects`, { cache: "no-store" });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return (Array.isArray(d.projects) ? d.projects : []).map((p) => p.id).filter(Boolean);
+  }
+
+  async function fetchSearch(project, q, page, pageSize) {
+    const qp = new URLSearchParams({
+      project: project || "",
+      q: q || "",
+      page: String(page || 1),
+      page_size: String(pageSize || 50),
+    });
+    const r = await fetch(`${API}/search?${qp.toString()}`, { cache: "no-store" });
     if (!r.ok) return null;
     return r.json();
+  }
+
+  async function tickAssets(force = false) {
+    if (state.tab !== "catalog") return;
+
+    if (!state.dbtProject) state.dbtProject = "his_dmo";
+    if (!state.page) state.page = 1;
+    if (!state.pageSize) state.pageSize = 50;
+
+    if (force || !Array.isArray(state.dbtProjects) || state.dbtProjects.length === 0) {
+      state.dbtProjects = await fetchDbtProjects();
+      if (state.dbtProjects.length && !state.dbtProjects.includes(state.dbtProject)) {
+        state.dbtProject = state.dbtProjects[0];
+      }
+      // re-render shell to populate dropdown deterministically
+      render();
+    }
+
+    const d = await fetchSearch(state.dbtProject, state.filter || "", state.page, state.pageSize);
+    if (d && d.assets) state.assets = d.assets;
+
+    // Update rows in-place clarify; do not call full render unless needed
+    updateCatalogRows();
   }
 
   async function tickSummary() {
@@ -272,24 +429,27 @@
       const s = await fetchSummary();
       apiPill.textContent = "API: ok";
       state.summary = s;
-      render();
+
+      // Avoid nuking catalog UI every 30s; only full render if not in catalog
+      if (state.tab !== "catalog") {
+        render();
+      } else {
+        // still refresh MinIO card if user is on overview? (not applicable)
+        // keep catalog stable; nothing to update here from summary
+      }
     } catch {
       apiPill.textContent = "API: down";
       view.innerHTML = `<div class="card"><div class="bd"><div class="small">Failed to load /api/summary</div></div></div>`;
     }
   }
 
-  async function tickAssets() {
-    if (state.tab !== "catalog") return;
-    const a = await fetchSearch();
-    if (a && a.assets) state.assets = a.assets;
-    render();
-  }
+  // Tab click wiring
+  tabs.forEach((btn) => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
 
-  tabs.forEach(btn => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
-
+  // Boot
   setTab("overview");
   tickSummary();
-  setInterval(tickSummary, 30000);
-  setInterval(tickAssets, 60000);
+
+  summaryTimer = setInterval(tickSummary, 30000);
+  assetsTimer = setInterval(() => tickAssets(false), 60000);
 })();

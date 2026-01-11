@@ -1,55 +1,121 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${HERE}"
+while [[ "${ROOT}" != "/" && ! -f "${ROOT}/00-env.sh" ]]; do ROOT="$(dirname "${ROOT}")"; done
+[[ -f "${ROOT}/00-env.sh" ]] || { echo "[FATAL] cannot find 00-env.sh above ${HERE}"; exit 1; }
+
 # shellcheck source=/dev/null
-. "${HERE}/../../../00-env.sh"
+. "${ROOT}/00-env.sh"
+# shellcheck source=/dev/null
+. "${ROOT}/00-lib.sh"
+
 
 log "[03-zammad] start"
 
 require_cmd kubectl
-
 require_var TICKETS_NS
 require_var OPENKPI_NS
 require_var STORAGE_CLASS
-
 require_var POSTGRES_USER
 require_var POSTGRES_PASSWORD
 require_var POSTGRES_DB
-
 require_var ZAMMAD_ADMIN_EMAIL
 require_var ZAMMAD_ADMIN_PASSWORD
 
-NS="${TICKETS_NS}"
-kubectl get ns "${NS}" >/dev/null 2>&1 || kubectl create ns "${NS}"
+# Optional (ingress). If you don’t set them, the script will skip ingress.
+: "${TLS_MODE:=off}"
+: "${INGRESS_CLASS:=nginx}"
+: "${CERT_CLUSTER_ISSUER:=letsencrypt-http01}"
+: "${ZAMMAD_HOST:=}"
+: "${ZAMMAD_TLS_SECRET:=zammad-tls}"
 
-# --- Create zammad role+db in shared Postgres (inside Postgres pod) ---
-PG_POD="$(kubectl -n "${OPENKPI_NS}" get pod -l app=openkpi-postgres -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
-[[ -n "${PG_POD}" ]] || die "Postgres pod not found in ${OPENKPI_NS}. Run 02-postgres first."
+NS="${TICKETS_NS}"
+ensure_ns "${NS}"
+
+# ------------------------------------------------------------------------------
+# 01) Postgres bootstrap (repeatable, deterministic) using in-cluster psql pod
+# - no CREATE DATABASE failures
+# - no silent ignore
+# ------------------------------------------------------------------------------
+PG_SECRET="openkpi-postgres-secret"
+kubectl -n "${OPENKPI_NS}" get secret "${PG_SECRET}" >/dev/null 2>&1 \
+  || die "Missing ${OPENKPI_NS}/${PG_SECRET} (run core data plane modules first)."
+
+# Create a short-lived psql pod (no password on CLI)
+cat <<YAML | kubectl -n "${OPENKPI_NS}" apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: zammad-psql
+  labels: {app: zammad-psql}
+spec:
+  restartPolicy: Never
+  containers:
+    - name: psql
+      image: postgres:16-alpine
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: PGHOST
+          valueFrom: {secretKeyRef: {name: ${PG_SECRET}, key: host}}
+        - name: PGPORT
+          valueFrom: {secretKeyRef: {name: ${PG_SECRET}, key: port}}
+        - name: PGUSER
+          valueFrom: {secretKeyRef: {name: ${PG_SECRET}, key: username}}
+        - name: PGPASSWORD
+          valueFrom: {secretKeyRef: {name: ${PG_SECRET}, key: password}}
+        - name: PGDATABASE
+          valueFrom: {secretKeyRef: {name: ${PG_SECRET}, key: db}}
+      command: ["sh","-lc"]
+      args: ["sleep 3600"]
+YAML
+kubectl -n "${OPENKPI_NS}" wait --for=condition=Ready pod/zammad-psql --timeout=180s >/dev/null
 
 Z_DB="zammad"
 Z_USER="zammad"
 Z_PASS="${ZAMMAD_ADMIN_PASSWORD}"
+Z_PASS_SQL="${Z_PASS//\'/\'\'}"
 
-kubectl -n "${OPENKPI_NS}" exec "${PG_POD}" -- bash -lc "
-set -e
-export PGPASSWORD='${POSTGRES_PASSWORD}'
-psql -U '${POSTGRES_USER}' -d '${POSTGRES_DB}' -v ON_ERROR_STOP=1 <<SQL
-DO \$\$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='${Z_USER}') THEN
-    CREATE ROLE ${Z_USER} LOGIN PASSWORD '${Z_PASS}';
-  END IF;
-END \$\$;
+psql_scalar() {
+  local sql="$1"
+  kubectl -n "${OPENKPI_NS}" exec -i zammad-psql -c psql -- sh -lc \
+    "psql -v ON_ERROR_STOP=1 -q -tA" <<< "${sql}" | tr -d '[:space:]'
+}
+psql_exec() {
+  local sql="$1"
+  kubectl -n "${OPENKPI_NS}" exec -i zammad-psql -c psql -- sh -lc \
+    "psql -v ON_ERROR_STOP=1 -q" <<< "${sql}"
+}
 
-SELECT 'DB exists' WHERE EXISTS (SELECT 1 FROM pg_database WHERE datname='${Z_DB}');
-\\gexec
+log "[03-zammad] postgres preflight"
+psql_exec "select 1;" >/dev/null
 
-CREATE DATABASE ${Z_DB} OWNER ${Z_USER};
-ALTER DATABASE ${Z_DB} OWNER TO ${Z_USER};
-GRANT ALL PRIVILEGES ON DATABASE ${Z_DB} TO ${Z_USER};
-SQL
-" 2>/dev/null || true
+role_exists="$(psql_scalar "SELECT 1 FROM pg_roles WHERE rolname='${Z_USER}';" || true)"
+if [[ "${role_exists}" != "1" ]]; then
+  log "[03-zammad] create role ${Z_USER}"
+  psql_exec "CREATE ROLE ${Z_USER} LOGIN PASSWORD '${Z_PASS_SQL}';"
+else
+  log "[03-zammad] role exists ${Z_USER}"
+fi
+log "[03-zammad] enforce role password ${Z_USER}"
+psql_exec "ALTER ROLE ${Z_USER} LOGIN PASSWORD '${Z_PASS_SQL}';"
 
-# --- Secrets ---
+db_exists="$(psql_scalar "SELECT 1 FROM pg_database WHERE datname='${Z_DB}';" || true)"
+if [[ "${db_exists}" != "1" ]]; then
+  log "[03-zammad] create db ${Z_DB}"
+  psql_exec "CREATE DATABASE ${Z_DB} OWNER ${Z_USER};"
+else
+  log "[03-zammad] db exists ${Z_DB}"
+fi
+psql_exec "ALTER DATABASE ${Z_DB} OWNER TO ${Z_USER};" || true
+psql_exec "GRANT ALL PRIVILEGES ON DATABASE ${Z_DB} TO ${Z_USER};" || true
+
+kubectl -n "${OPENKPI_NS}" delete pod zammad-psql --ignore-not-found >/dev/null 2>&1 || true
+
+# ------------------------------------------------------------------------------
+# 02) Zammad secret (kept; but do not embed passwords in manifests elsewhere)
+# ------------------------------------------------------------------------------
 cat <<YAML | kubectl -n "${NS}" apply -f -
 apiVersion: v1
 kind: Secret
@@ -68,7 +134,9 @@ stringData:
   ZAMMAD_ADMIN_PASSWORD: "${ZAMMAD_ADMIN_PASSWORD}"
 YAML
 
-# --- PVC for attachments/data ---
+# ------------------------------------------------------------------------------
+# 03) PVC
+# ------------------------------------------------------------------------------
 cat <<YAML | kubectl -n "${NS}" apply -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -82,7 +150,9 @@ spec:
       storage: 30Gi
 YAML
 
-# --- Redis (in-namespace) ---
+# ------------------------------------------------------------------------------
+# 04) Redis
+# ------------------------------------------------------------------------------
 cat <<YAML | kubectl -n "${NS}" apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -91,21 +161,17 @@ metadata:
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: zammad-redis
+    matchLabels: {app: zammad-redis}
   template:
     metadata:
-      labels:
-        app: zammad-redis
+      labels: {app: zammad-redis}
     spec:
       containers:
         - name: redis
           image: redis:7-alpine
-          ports:
-            - containerPort: 6379
+          ports: [{containerPort: 6379}]
           readinessProbe:
-            tcpSocket:
-              port: 6379
+            tcpSocket: {port: 6379}
             initialDelaySeconds: 5
             periodSeconds: 5
 ---
@@ -115,19 +181,20 @@ metadata:
   name: zammad-redis
 spec:
   type: ClusterIP
-  selector:
-    app: zammad-redis
+  selector: {app: zammad-redis}
   ports:
     - name: redis
       port: 6379
       targetPort: 6379
 YAML
+kubectl -n "${NS}" rollout status deploy/zammad-redis --timeout=5m
 
-kubectl -n "${NS}" rollout status deploy/zammad-redis --timeout=180s
-
-# --- Zammad (single pod) ---
-# Image line: zammad/zammad-docker-compose is outdated; use official monolith image.
-# This is a pragmatic single-container deployment for MVP. Later split into web/scheduler/worker.
+# ------------------------------------------------------------------------------
+# 05) Zammad (repeatable + no false timeout)
+# - initContainer fixes PVC perms (common cause of stuck readiness)
+# - startupProbe allows long bootstrap without killing the pod
+# - readiness/liveness relaxed
+# ------------------------------------------------------------------------------
 cat <<YAML | kubectl -n "${NS}" apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -136,13 +203,26 @@ metadata:
 spec:
   replicas: 1
   selector:
-    matchLabels:
-      app: zammad
+    matchLabels: {app: zammad}
   template:
     metadata:
-      labels:
-        app: zammad
+      labels: {app: zammad}
     spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        - name: volume-perms
+          image: busybox:1.36
+          command: ["sh","-lc"]
+          args:
+            - |
+              set -e
+              mkdir -p /opt/zammad
+              chown -R 1000:1000 /opt/zammad || true
+              chmod -R ug+rwX /opt/zammad || true
+          volumeMounts:
+            - name: zammad-data
+              mountPath: /opt/zammad
       containers:
         - name: zammad
           image: zammad/zammad:6.4.1
@@ -155,27 +235,29 @@ spec:
             - name: ZAMMAD_RAILSSERVER_PORT
               value: "3000"
             - name: DATABASE_URL
-              value: "postgres://${Z_USER}:${Z_PASS}@openkpi-postgres.${OPENKPI_NS}.svc.cluster.local:5432/${Z_DB}"
-            - name: REDIS_URL
-              value: "redis://zammad-redis:6379"
+              valueFrom: {secretKeyRef: {name: zammad-secret, key: DB_PASS}}
+          envFrom:
+            - secretRef: {name: zammad-secret}
           ports:
             - containerPort: 3000
           volumeMounts:
             - name: zammad-data
               mountPath: /opt/zammad
+          startupProbe:
+            httpGet: {path: /, port: 3000}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 90
           readinessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 60
+            httpGet: {path: /, port: 3000}
+            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 30
           livenessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 120
+            httpGet: {path: /, port: 3000}
+            initialDelaySeconds: 180
             periodSeconds: 20
             timeoutSeconds: 3
             failureThreshold: 10
@@ -190,14 +272,84 @@ metadata:
   name: zammad
 spec:
   type: ClusterIP
-  selector:
-    app: zammad
+  selector: {app: zammad}
   ports:
     - name: http
       port: 80
       targetPort: 3000
 YAML
 
-kubectl -n "${NS}" rollout status deploy/zammad --timeout=600s
+# Deterministic rollout + diagnostics
+if ! kubectl -n "${NS}" rollout status deploy/zammad --timeout=15m; then
+  kubectl -n "${NS}" get pods -o wide || true
+  kubectl -n "${NS}" get events --sort-by=.lastTimestamp | tail -n 120 || true
+  POD="$(kubectl -n "${NS}" get pod -l app=zammad -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  [[ -n "${POD}" ]] && kubectl -n "${NS}" describe pod "${POD}" | sed -n '1,320p' || true
+  [[ -n "${POD}" ]] && kubectl -n "${NS}" logs "${POD}" --all-containers --tail=300 || true
+  exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# 06) Optional TLS + Ingress (only if ZAMMAD_HOST is set)
+# ------------------------------------------------------------------------------
+if [[ -n "${ZAMMAD_HOST}" ]]; then
+  if [[ "${TLS_MODE}" != "off" ]]; then
+    cat <<YAML | kubectl -n "${NS}" apply -f -
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zammad-tls
+spec:
+  secretName: ${ZAMMAD_TLS_SECRET}
+  issuerRef:
+    kind: ClusterIssuer
+    name: ${CERT_CLUSTER_ISSUER}
+  dnsNames: [${ZAMMAD_HOST}]
+YAML
+  fi
+
+  if [[ "${TLS_MODE}" == "off" ]]; then
+    cat <<YAML | kubectl -n "${NS}" apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zammad-ingress
+  annotations:
+    kubernetes.io/ingress.class: "${INGRESS_CLASS}"
+spec:
+  ingressClassName: ${INGRESS_CLASS}
+  rules:
+    - host: ${ZAMMAD_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: zammad, port: {number: 80}}
+YAML
+  else
+    cat <<YAML | kubectl -n "${NS}" apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zammad-ingress
+  annotations:
+    kubernetes.io/ingress.class: "${INGRESS_CLASS}"
+spec:
+  ingressClassName: ${INGRESS_CLASS}
+  tls:
+    - hosts: [${ZAMMAD_HOST}]
+      secretName: ${ZAMMAD_TLS_SECRET}
+  rules:
+    - host: ${ZAMMAD_HOST}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: zammad, port: {number: 80}}
+YAML
+  fi
+fi
 
 log "[03-zammad] done"

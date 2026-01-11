@@ -319,40 +319,37 @@ ${ING_TLS_BLOCK}
                   number: 3000
 YAML
 
-
 # ------------------------------------------------------------------------------
-# 07) Tests
+# 07) Tests (deterministic)
 # ------------------------------------------------------------------------------
 
 log "[${MODULE_ID}][metabase] rollout"
 kubectl -n "${ANALYTICS_NS}" rollout status deploy/metabase --timeout=10m
 
-log "[${MODULE_ID}][metabase] in-cluster service reachability"
-kubectl -n "${ANALYTICS_NS}" delete pod metabase-curl --ignore-not-found >/dev/null 2>&1 || true
-cat <<YAML | kubectl -n "${ANALYTICS_NS}" apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: metabase-curl
-spec:
-  restartPolicy: Never
-  containers:
-    - name: curl
-      image: curlimages/curl:8.10.1
-      command: ["sh","-lc"]
-      args:
-        - |
-          set -euo pipefail
-          curl -fsS -m 10 "http://metabase.${ANALYTICS_NS}.svc.cluster.local:3000/api/health" >/dev/null
-YAML
-# pod may exit fast; just read logs to confirm success
-kubectl -n "${ANALYTICS_NS}" wait --for=condition=Initialized pod/metabase-curl --timeout=60s >/dev/null 2>&1 || true
-kubectl -n "${ANALYTICS_NS}" logs metabase-curl -c curl --tail=80 >/dev/null 2>&1
-kubectl -n "${ANALYTICS_NS}" delete pod metabase-curl --ignore-not-found >/dev/null 2>&1 || true
+log "[${MODULE_ID}][metabase] in-cluster service reachability (retry)"
+# Use an ephemeral pod so we don't depend on host curl, and we retry until Metabase is actually serving.
+kubectl -n "${ANALYTICS_NS}" run -i --rm --restart=Never metabase-curl \
+  --image="curlimages/curl:8.10.1" \
+  --command -- sh -lc '
+set -euo pipefail
+URL="http://metabase.'"${ANALYTICS_NS}"'.svc.cluster.local:3000/api/health"
+i=0
+while [ $i -lt 60 ]; do
+  # -f fail on non-2xx, -sS quiet but show errors, -L follow redirects, short timeouts
+  if curl -fsSL -m 3 "$URL" >/dev/null 2>&1; then
+    exit 0
+  fi
+  i=$((i+1))
+  sleep 2
+done
+echo "metabase in-cluster health never became ready"
+exit 1
+' >/dev/null
 
 log "[${MODULE_ID}][metabase] DNS + ingress health"
 getent ahosts "${METABASE_HOST}" >/dev/null 2>&1 || die "DNS does not resolve: ${METABASE_HOST}"
-HTTP_CODE="$(curl -k -sS -o /dev/null -m 20 -w '%{http_code}' "${URL_SCHEME}://${METABASE_HOST}/api/health" || true)"
+
+HTTP_CODE="$(curl -k -sS -L -o /dev/null -m 20 -w '%{http_code}' "${URL_SCHEME}://${METABASE_HOST}/api/health" || true)"
 [[ "${HTTP_CODE}" == "200" ]] || die "Ingress health failed: http_code=${HTTP_CODE}"
 
 if [[ "${TLS_MODE}" != "off" ]]; then

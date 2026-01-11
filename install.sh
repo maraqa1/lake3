@@ -34,7 +34,8 @@ run_step "02-minio" "modules/02-data-plane/02-minio.sh" "modules/02-data-plane/t
 run_step "03-airbyte" "modules/03-apps/airbyte/03-app-airbyte.sh" "modules/03-apps/airbyte/03-app-airbyte-tests.sh"
 
 run_step "03-dbt"      "modules/03-apps/dbt/03-app-dbt.sh"       "modules/03-apps/dbt/03-app-dbt-tests.sh"
-run_step "03-dbt-docs" "modules/03-apps/dbt/03A-app-dbt-docs.sh" "modules/03-apps/dbt/03-app-airbyte-tests.sh"
+run_step "03-dbt-docs" "modules/03-apps/dbt/03A-app-dbt-docs.sh"
+
 
 
 run_step "03-metabase" "modules/03-apps/metabase/03-app-metabase.sh" "modules/03-apps/metabase/03-app-metabase-tests.sh"

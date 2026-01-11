@@ -18,7 +18,13 @@ run_step(){
 }
 
 # --- PRE-REQ: bootstrap cluster once ---
-./modules/00-core/01-prereq-k3s.sh
+if ! command -v k3s >/dev/null 2>&1; then
+  log "bootstrap: k3s prereq"
+  ( cd "${HERE}" && bash "./modules/00-core/01-prereq-k3s.sh" )
+else
+  log "bootstrap: k3s already present, skipping"
+fi
+
 
 run_step "00-env" "modules/00-env/00-env.sh" "modules/00-env/tests.sh"
 run_step "01-core" "modules/01-core/01-core.sh" "modules/01-core/tests.sh"
@@ -27,8 +33,9 @@ run_step "02-minio" "modules/02-data-plane/02-minio.sh" "modules/02-data-plane/t
 #run_step "02-minio-https" "modules/02-data-plane/02-minio-https.sh"
 run_step "03-airbyte" "modules/03-apps/airbyte/03-app-airbyte.sh" "modules/03-apps/airbyte/03-app-airbyte-tests.sh"
 
-run_step "03-dbt" "modules/03-apps/dbt/03-app-dbt.sh" "modules/03-apps/dbt/03-app-dbt-tests.sh"
-run_step "03-dbt" "modules/03-apps/dbt/03A-app-dbt-docs.sh" "modules/03-apps/airbyte/03-app-airbyte-tests.sh"
+run_step "03-dbt"      "modules/03-apps/dbt/03-app-dbt.sh"       "modules/03-apps/dbt/03-app-dbt-tests.sh"
+run_step "03-dbt-docs" "modules/03-apps/dbt/03A-app-dbt-docs.sh" "modules/03-apps/dbt/03-app-airbyte-tests.sh"
+
 
 run_step "03-metabase" "modules/03-apps/metabase/03-app-metabase.sh" "modules/03-apps/metabase/03-app-metabase-tests.sh"
 

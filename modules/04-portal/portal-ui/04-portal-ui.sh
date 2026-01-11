@@ -10,7 +10,12 @@ set -euo pipefail
 #     /api -> ${PORTAL_API_SVC}:${PORTAL_API_PORT}
 #     /    -> portal-ui:80
 #
-# Critical: uses MODULE_DIR, not HERE (00-env.sh overwrites HERE).
+# TLS contract (FIXED):
+# - If TLS_MODE != off, this module MUST create a cert-manager Certificate that
+#   writes ${PLATFORM_NS}/${PORTAL_TLS_SECRET}, then Ingress references it.
+#
+# Host conflict contract:
+# - No other Ingress in any namespace may claim ${PORTAL_HOST}.
 # ==============================================================================
 
 MODULE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,8 +41,9 @@ require_cmd kubectl tar
 
 : "${TLS_MODE:=off}"
 : "${PORTAL_TLS_SECRET:=portal-tls}"
+: "${CERT_CLUSTER_ISSUER:=letsencrypt-http01}"
 
-log "[04][portal-ui] start (ns=${PLATFORM_NS}, host=${PORTAL_HOST})"
+log "[04][portal-ui] start (ns=${PLATFORM_NS}, host=${PORTAL_HOST}, tls_mode=${TLS_MODE})"
 
 kubectl get ns "${PLATFORM_NS}" >/dev/null 2>&1 || kubectl create ns "${PLATFORM_NS}" >/dev/null
 
@@ -59,7 +65,54 @@ if [[ "${TLS_MODE}" != "off" && "${TLS_MODE}" != "OFF" ]]; then
   TLS_ENABLED="true"
 fi
 
-# IMPORTANT: portal-api ingress must NOT exist; this ingress owns /api and / on the same host.
+# ------------------------------------------------------------------------------
+# Guardrail: detect host conflicts (same host claimed by multiple ingresses)
+# ------------------------------------------------------------------------------
+HOST_OWNERS="$(kubectl get ingress -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{range .spec.rules[*]}{.host}{" "}{end}{"\n"}{end}' \
+  | awk -v h="${PORTAL_HOST}" '$0 ~ h {print $0}' || true)"
+
+OWNER_COUNT="$(printf "%s\n" "${HOST_OWNERS}" | sed '/^\s*$/d' | wc -l | tr -d ' ')"
+if [[ "${OWNER_COUNT}" -gt 1 ]]; then
+  echo "FATAL: host ${PORTAL_HOST} is claimed by multiple Ingress objects:"
+  printf "%s\n" "${HOST_OWNERS}"
+  echo "Fix: delete/rename the other ingress(es) so ONLY ${PLATFORM_NS}/portal-ingress owns ${PORTAL_HOST}."
+  exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# TLS: create Certificate -> Secret in SAME namespace as Ingress (platform)
+# ------------------------------------------------------------------------------
+if [[ "${TLS_ENABLED}" == "true" ]]; then
+  kubectl apply -f - <<YAML
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ${PORTAL_TLS_SECRET}
+  namespace: ${PLATFORM_NS}
+spec:
+  secretName: ${PORTAL_TLS_SECRET}
+  dnsNames:
+    - ${PORTAL_HOST}
+  issuerRef:
+    kind: ClusterIssuer
+    name: ${CERT_CLUSTER_ISSUER}
+YAML
+fi
+
+# ------------------------------------------------------------------------------
+# Ingress manifest with inline TLS (no post-patch)
+# ------------------------------------------------------------------------------
+INGRESS_TLS_BLOCK=""
+if [[ "${TLS_ENABLED}" == "true" ]]; then
+  INGRESS_TLS_BLOCK=$(cat <<EOF
+  tls:
+    - hosts:
+        - ${PORTAL_HOST}
+      secretName: ${PORTAL_TLS_SECRET}
+EOF
+)
+fi
+
 kubectl apply -f - <<YAML
 apiVersion: apps/v1
 kind: Deployment
@@ -134,6 +187,7 @@ metadata:
     kubernetes.io/ingress.class: ${INGRESS_CLASS}
 spec:
   ingressClassName: ${INGRESS_CLASS}
+${INGRESS_TLS_BLOCK}
   rules:
     - host: ${PORTAL_HOST}
       http:
@@ -154,11 +208,16 @@ spec:
                   number: 80
 YAML
 
+kubectl -n "${PLATFORM_NS}" rollout status "deploy/${PORTAL_UI_DEPLOY}" --timeout=300s
+
+# If TLS is on, wait briefly for secret existence (issuer async)
 if [[ "${TLS_ENABLED}" == "true" ]]; then
-  kubectl -n "${PLATFORM_NS}" patch ingress portal-ingress --type merge -p "{
-    \"spec\": { \"tls\": [ { \"hosts\": [ \"${PORTAL_HOST}\" ], \"secretName\": \"${PORTAL_TLS_SECRET}\" } ] }
-  }" >/dev/null 2>&1 || true
+  for i in {1..60}; do
+    if kubectl -n "${PLATFORM_NS}" get secret "${PORTAL_TLS_SECRET}" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
 fi
 
-kubectl -n "${PLATFORM_NS}" rollout status "deploy/${PORTAL_UI_DEPLOY}" --timeout=300s
 log "[04][portal-ui] OK"

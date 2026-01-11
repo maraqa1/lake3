@@ -168,6 +168,25 @@ helm_k(){ helm --kubeconfig="${OPENKPI_KUBECONFIG}" "$@"; }
 
 kubectl_k get nodes >/dev/null 2>&1 || die "Cluster unreachable via ${OPENKPI_KUBECONFIG}"
 
+
+# ------------------------------------------------------------------------------
+# Baseline namespaces (must exist before any -n <ns> apply)
+# ------------------------------------------------------------------------------
+: "${PLATFORM_NS:=platform}"
+: "${ANALYTICS_NS:=analytics}"
+: "${AIRBYTE_NS:=airbyte}"
+: "${TRANSFORM_NS:=transform}"
+: "${N8N_NS:=n8n}"
+: "${ZAMMAD_NS:=zammad}"
+
+kubectl_k get ns "${OPENKPI_NS}"   >/dev/null 2>&1 || kubectl_k create ns "${OPENKPI_NS}"   >/dev/null
+kubectl_k get ns "${PLATFORM_NS}"  >/dev/null 2>&1 || kubectl_k create ns "${PLATFORM_NS}"  >/dev/null
+kubectl_k get ns "${ANALYTICS_NS}" >/dev/null 2>&1 || kubectl_k create ns "${ANALYTICS_NS}" >/dev/null
+kubectl_k get ns "${AIRBYTE_NS}"   >/dev/null 2>&1 || kubectl_k create ns "${AIRBYTE_NS}"   >/dev/null
+kubectl_k get ns "${TRANSFORM_NS}" >/dev/null 2>&1 || kubectl_k create ns "${TRANSFORM_NS}" >/dev/null
+kubectl_k get ns "${N8N_NS}"       >/dev/null 2>&1 || kubectl_k create ns "${N8N_NS}"       >/dev/null
+kubectl_k get ns "${ZAMMAD_NS}"    >/dev/null 2>&1 || kubectl_k create ns "${ZAMMAD_NS}"    >/dev/null
+
 # ------------------------------------------------------------------------------
 # TLS contract validation
 # ------------------------------------------------------------------------------

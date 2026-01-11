@@ -154,6 +154,18 @@ spec:
               mc alias set ok "\${MINIO_ENDPOINT}" "\${MINIO_ACCESS_KEY}" "\${MINIO_SECRET_KEY}" --api S3v4
               rm -rf /html/* || true
               mc mirror --overwrite "ok/\${DBT_DOCS_BUCKET}/\${DBT_DOCS_PREFIX}/" /html || true
+              # Always ensure a probeable page exists (prevents nginx 403 on empty dir)
+              if [ ! -f /html/index.html ]; then
+                cat > /html/index.html <<'EOF'
+              <!doctype html>
+              <html><head><meta charset="utf-8"><title>dbt docs not published</title></head>
+              <body style="font-family: Arial, sans-serif">
+                <h3>dbt docs not published yet</h3>
+                <p>MinIO prefix is empty. Publish docs, then re-run this module.</p>
+              </body></html>
+              EOF
+              fi
+              
               if [ "\${DBT_DOCS_STRICT}" = "on" ]; then
                 test -f /html/index.html
                 test -f /html/manifest.json
@@ -168,13 +180,13 @@ spec:
           ports:
             - {containerPort: 80}
           readinessProbe:
-            httpGet: {path: /, port: 80}
+            httpGet: {path: /index.html, port: 80}
             initialDelaySeconds: 2
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 12
           livenessProbe:
-            httpGet: {path: /, port: 80}
+            httpGet: {path: /index.html, port: 80}
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 2
